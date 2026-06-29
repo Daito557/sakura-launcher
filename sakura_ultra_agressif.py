@@ -65,36 +65,6 @@ def record_launch(username):
     save_stats(d)
     return d
 
-# ── Trophées (système partagé via le serveur de présence) ────────────────────
-# Catalogue fixe : id -> (icône, nom, description). L'ordre ici est l'ordre
-# d'affichage dans la page Classement.
-TROPHIES = {
-    "first_launch":   ("🎮", "Premier pas",       "Lancer Minecraft pour la première fois"),
-    "launches_10":    ("🔥", "Habitué",            "10 lancements depuis ce launcher"),
-    "launches_50":    ("⭐", "Vétéran",            "50 lancements depuis ce launcher"),
-    "launches_200":   ("👑", "Légende",            "200 lancements depuis ce launcher"),
-    "skin_custom":    ("🎨", "Stylé",              "Appliquer un skin personnalisé"),
-    "mod_dropper":    ("🧩", "Bricoleur",          "Installer un mod par glisser-déposer"),
-    "shader_installed": ("✨", "Esthète",          "Installer un shaderpack"),
-    "admin":          ("🛡", "Modérateur",         "Devenir admin du serveur de présence"),
-}
-
-TROPHIES_FILE = BASE_DIR / "trophies.json"
-
-def load_trophies():
-    try:
-        if TROPHIES_FILE.exists():
-            return json.loads(TROPHIES_FILE.read_text("utf-8"))
-    except Exception:
-        pass
-    return {}
-
-def save_trophies(d):
-    try:
-        TROPHIES_FILE.write_text(json.dumps(d, indent=2, ensure_ascii=False), "utf-8")
-    except Exception:
-        pass
-
 DISCORD_SUPPORT_URL = "https://discord.gg/zqw8KGKWJ"
 
 NEOFORGE_API = "https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/neoforge"
@@ -332,7 +302,7 @@ class StatRow(ctk.CTkFrame):
 class SakuraLauncher:
     def __init__(self):
         self.root = ctk.CTk()
-        self.root.title("Sakura Launcher")
+        self.root.title("Sakura Launcher (Ultra Agressif)")
         self._set_window_icon()
         self.root.geometry("1280x780")
         self.root.minsize(1100, 680)
@@ -378,19 +348,10 @@ class SakuraLauncher:
         self._mc_pid       = None
         self._is_admin     = False
         self._announcement_seen_at = 0.0
-        self._is_minimized = False
         self._stats        = load_stats()
-        self._trophies      = load_trophies()
         self._ms_account    = self._cfg.get("ms_account")  # {name, uuid, access_token, refresh_token}
         self._build_ui()
         self._show_page("accueil")
-        # Coupe les sondages réseau non essentiels (liste des joueurs en
-        # ligne, vérif de mise à jour, annonces) quand la fenêtre est
-        # minimisée : personne ne les regarde à ce moment, ça économise du
-        # CPU/réseau en continu sans rien changer de visible. Le heartbeat
-        # (pour que les autres te voient toujours en ligne) continue.
-        self.root.bind("<Unmap>", self._on_window_state_change)
-        self.root.bind("<Map>", self._on_window_state_change)
         self._load_versions()
         self._start_stat_loop()
         self._init_rpc()
@@ -438,7 +399,6 @@ class SakuraLauncher:
             "mods":         self._page_mods,
             "ressource":    self._page_ressource,
             "shaders":      self._page_shaders,
-            "classement":   self._page_classement,
             "optimisation": self._page_optimisation,
             "reseau":       self._page_reseau,
             "parametres":   self._page_parametres,
@@ -483,7 +443,6 @@ class SakuraLauncher:
             ("mods",         "⚙",  "Mods"),
             ("ressource",    "🖼", "Ressource Packs"),
             ("shaders",      "✨", "Shaderpacks"),
-            ("classement",   "🏆", "Classement"),
             ("optimisation", "⚡", "Optimisation"),
             ("reseau",       "🌐", "Réseau"),
             ("parametres",   "⚙",  "Paramètres"),
@@ -601,14 +560,6 @@ class SakuraLauncher:
         for k, b in self._nav_btns.items():
             b.set_active(k == key)
         self._current_page = key
-
-    def _on_window_state_change(self, event):
-        if event.widget is not self.root:
-            return  # <Unmap>/<Map> se propagent aussi depuis des widgets enfants
-        try:
-            self._is_minimized = bool(self.root.state() == "iconic")
-        except Exception:
-            pass
 
     def _toggle_boost(self):
         self.boost_active.set(not self.boost_active.get())
@@ -1037,12 +988,11 @@ class SakuraLauncher:
         lbl.pack(anchor="w", padx=12, pady=(0,6))
         return lbl
 
-    def _hook_drop_targets(self, targets, dest_dir, exts, on_complete, kind_label, trophy_id=None):
+    def _hook_drop_targets(self, targets, dest_dir, exts, on_complete, kind_label):
         """Accroche windnd sur les widgets `targets` : tout fichier déposé
         dont l'extension matche `exts` est copié dans dest_dir, puis
         on_complete() est appelé pour rafraîchir l'UI. Ne fait rien si
-        windnd n'est pas dispo (HAS_DND False, ex: hors Windows). Si
-        trophy_id est fourni, débloque ce trophée au premier drop réussi."""
+        windnd n'est pas dispo (HAS_DND False, ex: hors Windows)."""
         if not HAS_DND:
             return
         def handler(files):
@@ -1052,8 +1002,6 @@ class SakuraLauncher:
                 msg = f"{added} {kind_label}(s) ajouté(s) par glisser-déposer"
                 if skipped: msg += f" ({skipped} fichier(s) ignoré(s))"
                 self._add_log(msg)
-                if added > 0 and trophy_id:
-                    self._unlock_trophy(trophy_id)
             self.root.after(0, upd)
         for t in targets:
             try:
@@ -1087,8 +1035,7 @@ class SakuraLauncher:
 
         self._hook_drop_targets(
             (card, self._mods_page_scroll), MODS_DIR, {".jar"},
-            lambda: (self._refresh_mods_page(), self._refresh_mods_list()), "mod",
-            trophy_id="mod_dropper")
+            lambda: (self._refresh_mods_page(), self._refresh_mods_list()), "mod")
 
     def _refresh_mods_page(self):
         for w in self._mods_page_scroll.winfo_children(): w.destroy()
@@ -1186,8 +1133,7 @@ class SakuraLauncher:
 
         self._hook_drop_targets(
             (card, self._sh_scroll), sh_dir, {".zip"},
-            self._refresh_shaders_page, "shaderpack",
-            trophy_id="shader_installed")
+            self._refresh_shaders_page, "shaderpack")
 
     def _refresh_shaders_page(self):
         for w in self._sh_scroll.winfo_children(): w.destroy()
@@ -1204,111 +1150,6 @@ class SakuraLauncher:
             size = f"{round(p.stat().st_size/1024)} KB"
             ctk.CTkLabel(r, text=size, text_color=TEXT3,
                          font=ctk.CTkFont(size=11)).pack(side="right", padx=12)
-
-    # ── CLASSEMENT & TROPHÉES ────────────────────────────────────────────────
-
-    def _page_classement(self, f):
-        ctk.CTkLabel(f, text="Classement", font=ctk.CTkFont(size=24, weight="bold"),
-                     text_color=TEXT).pack(anchor="w", padx=24, pady=(18,8))
-        scroll = ctk.CTkScrollableFrame(f, fg_color=BG, scrollbar_button_color=CARD2)
-        scroll.pack(fill="both", expand=True, padx=24, pady=(0,20))
-
-        row = ctk.CTkFrame(scroll, fg_color="transparent")
-        row.pack(fill="x", pady=(0,16))
-
-        # ── Tableau de classement (par nombre de lancements, tous postes) ──
-        lb_c = Card(row, "TABLEAU DE CLASSEMENT")
-        lb_c.pack(side="left", fill="both", expand=True, padx=(0,8))
-        ctk.CTkLabel(
-            lb_c, text="Classé par nombre de lancements, via le serveur de présence.",
-            text_color=TEXT3, font=ctk.CTkFont(size=10)).pack(anchor="w", padx=12, pady=(2,6))
-        self._lb_scroll = ctk.CTkScrollableFrame(lb_c, fg_color=CARD2, height=320)
-        self._lb_scroll.pack(fill="both", expand=True, padx=12, pady=(0,8))
-        ctk.CTkButton(lb_c, text="🔄 Actualiser", height=30,
-                      fg_color=CARD2, border_color=BORDER, border_width=1,
-                      text_color=TEXT2, font=ctk.CTkFont(size=11),
-                      command=self._refresh_leaderboard).pack(fill="x", padx=12, pady=(0,12))
-
-        # ── Mes trophées ─────────────────────────────────────────────────
-        tr_c = Card(row, "MES TROPHÉES")
-        tr_c.pack(side="right", fill="both", expand=True)
-        self._trophy_grid = ctk.CTkFrame(tr_c, fg_color="transparent")
-        self._trophy_grid.pack(fill="both", expand=True, padx=12, pady=(2,12))
-        self._refresh_trophy_grid()
-
-        self._refresh_leaderboard()
-
-    def _refresh_trophy_grid(self):
-        for w in self._trophy_grid.winfo_children(): w.destroy()
-        unlocked_count = 0
-        for i, (tid, (icon, name, desc)) in enumerate(TROPHIES.items()):
-            unlocked = tid in self._trophies
-            if unlocked: unlocked_count += 1
-            r = ctk.CTkFrame(self._trophy_grid, fg_color=CARD2 if unlocked else "transparent",
-                              corner_radius=8, border_width=1,
-                              border_color=ACCENT if unlocked else BORDER)
-            r.pack(fill="x", pady=3)
-            ctk.CTkLabel(r, text=icon if unlocked else "🔒",
-                         font=ctk.CTkFont(size=18),
-                         text_color=TEXT if unlocked else TEXT3).pack(side="left", padx=10, pady=8)
-            txt = ctk.CTkFrame(r, fg_color="transparent")
-            txt.pack(side="left", fill="x", expand=True, pady=6)
-            ctk.CTkLabel(txt, text=name, text_color=TEXT if unlocked else TEXT3,
-                         font=ctk.CTkFont(size=12, weight="bold"), anchor="w").pack(fill="x")
-            ctk.CTkLabel(txt, text=desc, text_color=TEXT3,
-                         font=ctk.CTkFont(size=10), anchor="w").pack(fill="x")
-        ctk.CTkLabel(self._trophy_grid,
-                     text=f"{unlocked_count}/{len(TROPHIES)} trophées débloqués",
-                     text_color=ACCENT2, font=ctk.CTkFont(size=11, weight="bold")
-                     ).pack(anchor="w", pady=(8,0))
-
-    def _refresh_leaderboard(self):
-        for w in self._lb_scroll.winfo_children(): w.destroy()
-        url = self.server_url.get().strip()
-        if not url:
-            ctk.CTkLabel(self._lb_scroll,
-                         text="Configure le serveur de présence dans Paramètres\npour voir le classement.",
-                         text_color=TEXT3, font=ctk.CTkFont(size=11), justify="left").pack(pady=10)
-            return
-        ctk.CTkLabel(self._lb_scroll, text="Chargement...",
-                     text_color=TEXT3, font=ctk.CTkFont(size=11)).pack(pady=10)
-        def run():
-            try:
-                req = urllib.request.Request(url.rstrip("/") + "/leaderboard", method="GET")
-                with urllib.request.urlopen(req, timeout=5) as resp:
-                    data = json.loads(resp.read().decode("utf-8"))
-                rows = data.get("leaderboard", [])
-            except Exception:
-                rows = None
-            self.root.after(0, lambda: self._render_leaderboard(rows))
-        threading.Thread(target=run, daemon=True).start()
-
-    def _render_leaderboard(self, rows):
-        for w in self._lb_scroll.winfo_children(): w.destroy()
-        if rows is None:
-            ctk.CTkLabel(self._lb_scroll, text="Serveur inaccessible.",
-                         text_color=RED_C, font=ctk.CTkFont(size=11)).pack(pady=10)
-            return
-        if not rows:
-            ctk.CTkLabel(self._lb_scroll, text="Personne n'a encore de lancement enregistré.",
-                         text_color=TEXT3, font=ctk.CTkFont(size=11)).pack(pady=10)
-            return
-        current = self.username.get().strip()
-        medals = {0: "🥇", 1: "🥈", 2: "🥉"}
-        for i, row in enumerate(rows):
-            name = row.get("username", "?")
-            r = ctk.CTkFrame(self._lb_scroll,
-                              fg_color=ACT_BG if name == current else "transparent")
-            r.pack(fill="x", pady=2)
-            rank_txt = medals.get(i, f"#{i+1}")
-            ctk.CTkLabel(r, text=rank_txt, width=36,
-                         font=ctk.CTkFont(size=13, weight="bold"),
-                         text_color=ACCENT2 if i < 3 else TEXT3).pack(side="left", padx=(8,4))
-            ctk.CTkLabel(r, text=name + (" (vous)" if name == current else ""),
-                         text_color=TEXT, font=ctk.CTkFont(size=12,
-                         weight="bold" if name == current else "normal")).pack(side="left")
-            ctk.CTkLabel(r, text=f"{row.get('launches',0)} lancements · 🏆 {row.get('trophies',0)}",
-                         text_color=TEXT3, font=ctk.CTkFont(size=11)).pack(side="right", padx=10)
 
     # ── OPTIMISATION ──────────────────────────────────────────────────────────
 
@@ -1735,26 +1576,7 @@ class SakuraLauncher:
                                fill="#94a3b8", font=("Courier", 10), justify="center")
             return
 
-        # Cache des 4 angles déjà rendus pour ce skin : évite de refaire tout
-        # le travail PIL (crop/resize/compositing) à chaque rotation — utile
-        # surtout en auto-rotate (toutes les 1.1s) qui boucle sur les 4
-        # mêmes angles encore et encore.
         path = self._skin_path.get()
-        try:
-            mtime = Path(path).stat().st_mtime if path and Path(path).exists() else 0
-        except Exception:
-            mtime = 0
-        cache_key = (path, mtime, self._skin_angle % 4)
-        cache = getattr(self, "_skin_render_cache", None)
-        if cache is None or cache.get("_id") != (path, mtime):
-            cache = {"_id": (path, mtime)}
-            self._skin_render_cache = cache
-        cached_photo = cache.get(cache_key)
-        if cached_photo is not None:
-            canvas._photo = cached_photo
-            canvas.create_image(W//2, 0, image=cached_photo, anchor="n")
-            return
-
         if path and Path(path).exists():
             try:
                 skin = Image.open(path).convert("RGBA")
@@ -1840,7 +1662,6 @@ class SakuraLauncher:
 
         photo = ImageTk.PhotoImage(scene)
         canvas._photo = photo
-        cache[cache_key] = photo
         canvas.create_image(W//2, 0, image=photo, anchor="n")
 
     def _render_avatar(self):
@@ -1887,7 +1708,6 @@ class SakuraLauncher:
         name = Path(path).name if path else "Défaut"
         if path and Path(path).exists():
             self._install_skin_files(path)
-            self._unlock_trophy("skin_custom")
         self._save_config()
         self._add_log(f"Skin appliqué : {name}")
 
@@ -2166,15 +1986,12 @@ class SakuraLauncher:
                     boost_process_priority(proc.pid, "above")
                     self._add_log("Priorité CPU du jeu augmentée (Sakura Mode)")
                 self._mc_pid = proc.pid
-                self._priority_boost_failed = False
                 self.root.after(0, lambda: st.configure(text="Jeu lancé ! 🎮", text_color=GREEN))
                 self.root.after(0, lambda: bar.set(1))
                 self._add_log(f"{vid} lancé avec succès")
                 self._stats = record_launch(uname)
                 self.root.after(0, self._refresh_users_count_label)
                 self.root.after(0, self._safe_refresh_members_list)
-                self.root.after(0, lambda n=self._stats["launches"]: self._check_launch_trophies(n))
-                self._report_launch_to_server(uname)
                 self._rpc_update(state=f"En train de jouer {vid} — {uname}")
                 if self.close_on_launch.get():
                     self.root.after(2000, self.root.destroy)
@@ -2534,27 +2351,27 @@ class SakuraLauncher:
                              font=ctk.CTkFont(size=10)).pack(side="right", padx=6)
 
     def _start_background_optimizer(self):
-        """Optimisation continue en arrière-plan, volontairement prudente :
-        - ne libère JAMAIS que la mémoire du process du launcher lui-même
-          (trim_own_memory), jamais celle du jeu ni du système
-        - revérifie juste que le jeu garde bien sa priorité CPU "above
-          normal" (au cas où un autre outil la remettrait à zéro), sans
-          jamais monter plus haut (pas de HIGH/REALTIME, ça peut geler le PC)
-        - ne touche à rien d'autre : pas de kill de process, pas de purge de
-          cache système, pas de modification de services Windows
-        Tourne toutes les 20s, seulement si le Sakura Mode est activé."""
+        """Version ULTRA AGRESSIVE — pour PC faibles qui lag fort. Reste
+        scopée au seul process du launcher (jamais le jeu ni le système :
+        toujours pas de kill de process tiers, pas de purge système globale,
+        pas de service Windows touché) mais pousse le nettoyage mémoire au
+        maximum :
+        - gc.collect() ET trim_own_memory() à CHAQUE cycle (3s), sans
+          attendre un seuil de RAM système
+        - boucle 6-7x plus fréquente que la version normale (3s au lieu
+          de 20s) : plus d'overhead CPU du nettoyage lui-même, mais sur un
+          PC déjà saturé en RAM c'est ce qui compte le plus
+        - revérifie la priorité CPU "above normal" du jeu, jamais plus haut
+          (HIGH/REALTIME peut geler tout le PC, déjà vu)."""
         def loop():
             while True:
-                time.sleep(20)
+                time.sleep(3)
                 if not self.boost_active.get():
                     continue
                 try:
-                    used, total = get_ram_usage()
-                    if used and total and used / total > 0.90:
-                        if trim_own_memory():
-                            self._add_log(
-                                f"RAM système élevée ({used}/{total} GB) : "
-                                "mémoire du launcher libérée")
+                    import gc
+                    gc.collect()
+                    trim_own_memory()
                 except Exception:
                     pass
                 pid = self._mc_pid
@@ -2564,23 +2381,10 @@ class SakuraLauncher:
                         p = psutil.Process(pid)
                         if not p.is_running():
                             self._mc_pid = None
-                            self._priority_boost_failed = False
                         elif sys.platform == "win32" and \
                                 p.nice() != psutil.ABOVE_NORMAL_PRIORITY_CLASS:
-                            # On ne retente qu'une fois après un échec : sinon,
-                            # si le boost échoue en silence (ex: permissions),
-                            # on spamme cette tentative + ce log toutes les
-                            # 20s indéfiniment pendant toute la partie, pour
-                            # rien — vu en pratique avec "Priorité CPU du jeu
-                            # rétablie" répété en boucle dans les logs.
-                            if not getattr(self, "_priority_boost_failed", False):
-                                if boost_process_priority(pid, "above"):
-                                    self._add_log("Priorité CPU du jeu rétablie (Sakura Mode)")
-                                else:
-                                    self._priority_boost_failed = True
-                                    self._add_log(
-                                        "Boost de priorité du jeu impossible "
-                                        "(permissions ?) — abandon pour cette partie")
+                            boost_process_priority(pid, "above")
+                            self._add_log("Priorité CPU du jeu rétablie (Sakura Mode)")
                     except Exception:
                         self._mc_pid = None
         threading.Thread(target=loop, daemon=True).start()
@@ -2607,9 +2411,6 @@ class SakuraLauncher:
 
         def poll_loop():
             while True:
-                if self._is_minimized:
-                    time.sleep(5)
-                    continue
                 url = self.server_url.get().strip()
                 if url:
                     try:
@@ -2625,9 +2426,6 @@ class SakuraLauncher:
 
         def announcement_loop():
             while True:
-                if self._is_minimized:
-                    time.sleep(15)
-                    continue
                 url = self.server_url.get().strip()
                 if url:
                     try:
@@ -2708,8 +2506,6 @@ class SakuraLauncher:
             admins = set(data.get("admins", []))
             current = self.username.get().strip()
             self._is_admin = current in admins
-            if self._is_admin:
-                self._unlock_trophy("admin")
             prev_count = self._online_count
             self._online_count, self._online_users = len(users), users
             self._online_dot.configure(text="● Connecté", text_color=GREEN)
@@ -2795,96 +2591,6 @@ class SakuraLauncher:
         except Exception:
             pass
 
-    def _report_launch_to_server(self, username):
-        """Signale un lancement au serveur de présence pour le classement
-        (nombre de lancements par joueur, toutes machines confondues)."""
-        url = self.server_url.get().strip()
-        if not url or not username:
-            return
-        def run():
-            try:
-                req = urllib.request.Request(
-                    url.rstrip("/") + "/launch",
-                    data=json.dumps({"username": username}).encode("utf-8"),
-                    headers={"Content-Type": "application/json"},
-                    method="POST")
-                urllib.request.urlopen(req, timeout=5).read()
-            except Exception:
-                pass
-        threading.Thread(target=run, daemon=True).start()
-
-    def _unlock_trophy(self, trophy_id):
-        """Débloque un trophée localement (persisté dans trophies.json) et
-        le signale au serveur de présence pour qu'il soit visible par les
-        autres (classement, profil). Affiche un popup uniquement si c'est
-        un VRAI premier déblocage (pas à chaque relance du launcher)."""
-        if trophy_id in self._trophies:
-            return  # déjà débloqué localement, rien à refaire
-        if trophy_id not in TROPHIES:
-            return
-        self._trophies[trophy_id] = time.time()
-        save_trophies(self._trophies)
-        icon, name, desc = TROPHIES[trophy_id]
-        self._add_log(f"Trophée débloqué : {icon} {name} — {desc}")
-        self._show_trophy_popup(icon, name)
-        grid = getattr(self, "_trophy_grid", None)
-        if grid is not None:
-            try: self._refresh_trophy_grid()
-            except Exception: pass
-
-        url = self.server_url.get().strip()
-        uname = self.username.get().strip()
-        if url and uname:
-            def run():
-                try:
-                    req = urllib.request.Request(
-                        url.rstrip("/") + "/trophy",
-                        data=json.dumps({"username": uname, "trophy_id": trophy_id}).encode("utf-8"),
-                        headers={"Content-Type": "application/json"},
-                        method="POST")
-                    urllib.request.urlopen(req, timeout=5).read()
-                except Exception:
-                    pass
-            threading.Thread(target=run, daemon=True).start()
-
-    def _show_trophy_popup(self, icon, name):
-        """Petit popup façon "succès débloqué" (Steam-like), en bas à droite
-        de l'écran, qui disparaît seul après quelques secondes."""
-        try:
-            popup = tk.Toplevel(self.root)
-            popup.overrideredirect(True)
-            popup.attributes("-topmost", True)
-            try:
-                popup.attributes("-alpha", 0.96)
-            except Exception:
-                pass
-            frame = ctk.CTkFrame(popup, fg_color=CARD, corner_radius=10,
-                                  border_width=2, border_color=ACCENT)
-            frame.pack(fill="both", expand=True)
-            ctk.CTkLabel(frame, text=icon, font=ctk.CTkFont(size=28)).pack(
-                side="left", padx=(14,8), pady=12)
-            txt = ctk.CTkFrame(frame, fg_color="transparent")
-            txt.pack(side="left", padx=(0,16), pady=12)
-            ctk.CTkLabel(txt, text="Trophée débloqué !", text_color=ACCENT2,
-                         font=ctk.CTkFont(size=11, weight="bold")).pack(anchor="w")
-            ctk.CTkLabel(txt, text=name, text_color=TEXT,
-                         font=ctk.CTkFont(size=14, weight="bold")).pack(anchor="w")
-
-            self.root.update_idletasks()
-            w, h = 280, 64
-            x = self.root.winfo_x() + self.root.winfo_width() - w - 24
-            y = self.root.winfo_y() + self.root.winfo_height() - h - 24
-            popup.geometry(f"{w}x{h}+{x}+{y}")
-            popup.after(4000, popup.destroy)
-        except Exception:
-            pass
-
-    def _check_launch_trophies(self, launches_count):
-        self._unlock_trophy("first_launch")
-        if launches_count >= 10: self._unlock_trophy("launches_10")
-        if launches_count >= 50: self._unlock_trophy("launches_50")
-        if launches_count >= 200: self._unlock_trophy("launches_200")
-
     def _add_log(self, msg):
         ts=datetime.datetime.now().strftime("%H:%M:%S")
         line=f"[{ts}] [INFO] {msg}"
@@ -2924,30 +2630,24 @@ class SakuraLauncher:
         self._update_stats()
 
     def _update_stats(self):
-        """Boucle persistante (un seul thread qui dort en interne) au lieu
-        de créer un thread neuf toutes les 10s — moins d'overhead CPU sur
-        toute la durée d'une session de jeu. Met aussi en pause le ping
-        réseau quand la fenêtre est minimisée (personne ne regarde ces
-        stats à ce moment-là), pour économiser CPU/réseau en arrière-plan
-        sans rien changer de visible pour l'utilisateur."""
-        def loop():
-            while True:
-                if getattr(self, "_is_minimized", False):
-                    time.sleep(10)
-                    continue
-                used, total = get_ram_usage()
-                ms = ping_host("1.1.1.1")
-                def upd():
-                    if used and total:
-                        self._stat_ram.set(f"{used} / {total} GB")
-                    ms_str = f"{ms} ms" if ms else "--"
-                    col = GREEN if ms and ms<80 else ORANGE if ms and ms<200 else RED_C
-                    self._stat_ping.set(ms_str, col)
-                    self._stat_fps.set("-- (en jeu)")
-                    self._stat_tps.set("20.0")
-                self.root.after(0, upd)
-                time.sleep(10)
-        threading.Thread(target=loop, daemon=True).start()
+        def run():
+            used, total = get_ram_usage()
+            ms = ping_host("1.1.1.1")
+            def upd():
+                if used and total:
+                    self._stat_ram.set(f"{used} / {total} GB")
+                ms_str = f"{ms} ms" if ms else "--"
+                col = GREEN if ms and ms<80 else ORANGE if ms and ms<200 else RED_C
+                self._stat_ping.set(ms_str, col)
+                self._stat_fps.set("-- (en jeu)")
+                self._stat_tps.set("20.0")
+                # Reprogrammé depuis le thread principal (callback after) et
+                # non depuis le thread d'arrière-plan : appeler root.after()
+                # depuis un thread non-main n'est pas garanti thread-safe
+                # avec Tcl/Tk sur de longues sessions.
+                self.root.after(10000, self._update_stats)
+            self.root.after(0, upd)
+        threading.Thread(target=run, daemon=True).start()
 
     # ── Config persistence ────────────────────────────────────────────────────
 

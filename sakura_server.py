@@ -13,6 +13,14 @@ Minecraft) que tu considères comme admins de ton Discord/communauté.
 Un admin peut diffuser une annonce visible par tous les launchers
 connectés.
 
+Gère enfin un classement (nombre de lancements par joueur) et un
+système de trophées partagé : chaque launcher signale les trophées
+débloqués par son joueur, et tout le monde peut voir les trophées des
+autres (POST /trophy, GET /trophies, GET /leaderboard).
+
+Les données (lancements + trophées) sont persistées dans
+server_data.json à côté de ce script, pour survivre à un redémarrage.
+
 Lancement :
     python sakura_server.py [port]      (port par défaut : 8765)
 
@@ -24,9 +32,11 @@ import json
 import sys
 import time
 import threading
+from pathlib import Path
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 ONLINE_TIMEOUT = 30  # secondes sans heartbeat avant de considérer un joueur hors ligne
+DATA_FILE = Path(__file__).parent / "server_data.json"
 
 # Pseudos Minecraft des admins (édite cette liste avec les tiens).
 # Un admin peut diffuser une annonce visible par tous les launchers connectés.
@@ -41,6 +51,31 @@ _lock = threading.Lock()
 _last_seen = {}        # username -> timestamp du dernier heartbeat
 _all_users = set()      # tous les pseudos jamais vus (compteur cumulé)
 _announcement = None    # {"message": str, "by": str, "at": float} ou None
+_launches = {}          # username -> nombre de lancements (classement)
+_trophies = {}           # username -> {trophy_id: timestamp}
+
+
+def _load_data():
+    global _launches, _trophies, _all_users
+    if DATA_FILE.exists():
+        try:
+            d = json.loads(DATA_FILE.read_text("utf-8"))
+            _launches.update(d.get("launches", {}))
+            _trophies.update(d.get("trophies", {}))
+            _all_users.update(d.get("all_users", []))
+        except Exception:
+            pass
+
+
+def _save_data():
+    try:
+        DATA_FILE.write_text(json.dumps({
+            "launches": _launches,
+            "trophies": _trophies,
+            "all_users": sorted(_all_users),
+        }, ensure_ascii=False, indent=2), "utf-8")
+    except Exception:
+        pass
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -87,6 +122,34 @@ class Handler(BaseHTTPRequestHandler):
                     _announcement = None  # message vide = efface l'annonce
             self._send_json(200, {"ok": True})
 
+        elif self.path == "/launch":
+            data = self._read_json()
+            username = str(data.get("username", "")).strip()
+            if not username:
+                self._send_json(400, {"ok": False, "error": "username manquant"})
+                return
+            with _lock:
+                _launches[username] = _launches.get(username, 0) + 1
+                _all_users.add(username)
+                _save_data()
+                count = _launches[username]
+            self._send_json(200, {"ok": True, "launches": count})
+
+        elif self.path == "/trophy":
+            data = self._read_json()
+            username = str(data.get("username", "")).strip()
+            trophy_id = str(data.get("trophy_id", "")).strip()
+            if not username or not trophy_id:
+                self._send_json(400, {"ok": False, "error": "username/trophy_id manquant"})
+                return
+            with _lock:
+                user_trophies = _trophies.setdefault(username, {})
+                is_new = trophy_id not in user_trophies
+                if is_new:
+                    user_trophies[trophy_id] = time.time()
+                    _save_data()
+            self._send_json(200, {"ok": True, "new": is_new})
+
         else:
             self._send_json(404, {"ok": False, "error": "route inconnue"})
 
@@ -112,6 +175,25 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path == "/version":
             self._send_json(200, {"latest": LATEST_VERSION, "url": DOWNLOAD_URL})
 
+        elif self.path == "/leaderboard":
+            with _lock:
+                rows = [
+                    {"username": u, "launches": n, "trophies": len(_trophies.get(u, {}))}
+                    for u, n in _launches.items()
+                ]
+            rows.sort(key=lambda r: (-r["launches"], r["username"].lower()))
+            self._send_json(200, {"leaderboard": rows[:50]})
+
+        elif self.path.startswith("/trophies"):
+            qs = self.path.split("?", 1)[1] if "?" in self.path else ""
+            params = dict(p.split("=", 1) for p in qs.split("&") if "=" in p)
+            username = params.get("username", "")
+            import urllib.parse
+            username = urllib.parse.unquote(username)
+            with _lock:
+                data = dict(_trophies.get(username, {}))
+            self._send_json(200, {"trophies": data})
+
         else:
             self._send_json(404, {"ok": False, "error": "route inconnue"})
 
@@ -120,12 +202,16 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
+    _load_data()
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8765
     server = ThreadingHTTPServer(("0.0.0.0", port), Handler)
     print(f"Sakura presence server en écoute sur 0.0.0.0:{port}")
     print("Routes : POST /heartbeat {\"username\":...}  |  GET /online")
     print("         POST /announce  {\"username\":..., \"message\":...} (admin only)")
     print("         GET  /announcement")
+    print("         POST /launch    {\"username\":...}")
+    print("         POST /trophy    {\"username\":..., \"trophy_id\":...}")
+    print("         GET  /trophies?username=...  |  GET /leaderboard")
     print(f"Admins configurés : {', '.join(sorted(ADMIN_USERS)) or '(aucun)'}")
     try:
         server.serve_forever()

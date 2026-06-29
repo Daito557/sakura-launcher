@@ -12,4 +12,8 @@ crash_log.txt
 # Sorties de build PyInstaller
 build/
 dist/
+output/
 *.spec
+
+# Données locales du serveur de présence (lancements/trophées, pas du code)
+server_data.json

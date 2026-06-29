@@ -34,8 +34,10 @@ jobs:
 
       - name: Build Windows
         if: matrix.name == 'windows'
+        # --onefile : un seul .exe autonome (plus simple à distribuer, mais
+        # plus susceptible d'être flaggé par Windows Defender que --onedir)
         run: |
-          pyinstaller --noconfirm --onedir --windowed --noupx --name SakuraLauncher --distpath dist sakura.py
+          pyinstaller --noconfirm --onefile --windowed --noupx --name SakuraLauncher --distpath dist sakura.py
 
       - name: Build macOS
         if: matrix.name == 'macos'

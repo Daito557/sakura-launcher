@@ -95,6 +95,38 @@ def save_trophies(d):
     except Exception:
         pass
 
+def offline_uuid(username):
+    """UUID offline déterministe basé sur le pseudo, même algo que le
+    Minecraft vanilla — utilisé à la fois au lancement (compte non-MS) et
+    pour retrouver le fichier d'avancements du joueur dans saves/."""
+    import hashlib as _hl
+    raw = _hl.md5(("OfflinePlayer:" + username).encode()).digest()
+    b = bytearray(raw)
+    b[6] = (b[6] & 0x0f) | 0x30
+    b[8] = (b[8] & 0x3f) | 0x80
+    return "{:08x}-{:04x}-{:04x}-{:04x}-{:012x}".format(
+        int.from_bytes(b[0:4], 'big'), int.from_bytes(b[4:6], 'big'),
+        int.from_bytes(b[6:8], 'big'), int.from_bytes(b[8:10], 'big'),
+        int.from_bytes(b[10:16], 'big'))
+
+# ── Succès Minecraft (advancements) à intégrer comme trophées ────────────────
+# Sous-ensemble des succès vanilla les plus connus. clé = id d'avancement
+# Minecraft (sans le namespace "minecraft:"), valeur = (icône, nom, desc).
+MC_ADVANCEMENTS = {
+    "story/mine_stone":      ("⛏", "Pierre angulaire",      "Miner de la pierre avec une pioche en bois"),
+    "story/smelt_iron":      ("🔧", "Acquisition de fer",     "Fondre un lingot de fer"),
+    "story/obtain_armor":    ("🪖", "Habillé pour l'occasion", "Porter une pièce d'armure en fer"),
+    "story/mine_diamond":    ("💎", "Diamants !",             "Obtenir un diamant"),
+    "story/enter_the_nether": ("🔥", "Nous devons creuser plus profond", "Construire, allumer et entrer dans un portail du Nether"),
+    "story/enter_the_end":   ("🌌", "La fin ?",               "Entrer dans le portail de l'End"),
+    "end/kill_dragon":       ("🐉", "Libérer la fin",         "Tuer le dragon de l'End"),
+    "nether/find_fortress":  ("🏰", "Une terrible fortresse", "Trouver une forteresse du Nether"),
+    "husbandry/balanced_diet": ("🍗", "Régime équilibré",     "Manger tous les aliments du jeu"),
+    "adventure/kill_a_mob":  ("⚔", "Monstre Hunter",          "Tuer une créature hostile"),
+    "story/follow_ender_eye": ("👁", "Voyage vers l'End",     "Suivre un œil de l'Ender"),
+}
+TROPHIES.update({f"mc_{k}": v for k, v in MC_ADVANCEMENTS.items()})
+
 DISCORD_SUPPORT_URL = "https://discord.gg/zqw8KGKWJ"
 
 NEOFORGE_API = "https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/neoforge"
@@ -396,6 +428,7 @@ class SakuraLauncher:
         self._init_rpc()
         self._start_presence_loops()
         self._start_background_optimizer()
+        self.root.after(3000, self._scan_minecraft_advancements)
         self.username.trace_add("write", lambda *_: self._save_config())
         self.server_url.trace_add("write", lambda *_: self._save_config())
 
@@ -1232,8 +1265,13 @@ class SakuraLauncher:
         # ── Mes trophées ─────────────────────────────────────────────────
         tr_c = Card(row, "MES TROPHÉES")
         tr_c.pack(side="right", fill="both", expand=True)
+        ctk.CTkButton(tr_c, text="🏆 Vérifier mes succès Minecraft", height=30,
+                      fg_color=CARD2, border_color=BORDER, border_width=1,
+                      text_color=TEXT2, font=ctk.CTkFont(size=11),
+                      command=self._scan_minecraft_advancements).pack(
+                      fill="x", padx=12, pady=(2,6))
         self._trophy_grid = ctk.CTkFrame(tr_c, fg_color="transparent")
-        self._trophy_grid.pack(fill="both", expand=True, padx=12, pady=(2,12))
+        self._trophy_grid.pack(fill="both", expand=True, padx=12, pady=(0,12))
         self._refresh_trophy_grid()
 
         self._refresh_leaderboard()
@@ -2120,18 +2158,8 @@ class SakuraLauncher:
                     token = self._ms_account.get("access_token", "none")
                 else:
                     # UUID offline basé sur le pseudo (même algo que Minecraft vanilla)
-                    import hashlib as _hl
                     uname = self.username.get() or "Player"
-                    raw   = _hl.md5(("OfflinePlayer:" + uname).encode()).digest()
-                    b     = bytearray(raw)
-                    b[6]  = (b[6] & 0x0f) | 0x30  # version 3
-                    b[8]  = (b[8] & 0x3f) | 0x80  # variant
-                    uid   = "{:08x}-{:04x}-{:04x}-{:04x}-{:012x}".format(
-                        int.from_bytes(b[0:4], 'big'),
-                        int.from_bytes(b[4:6], 'big'),
-                        int.from_bytes(b[6:8], 'big'),
-                        int.from_bytes(b[8:10], 'big'),
-                        int.from_bytes(b[10:16], 'big'))
+                    uid   = offline_uuid(uname)
                     token = "none"
 
                 ram_xmx = int(self.ram_mb.get())
@@ -2884,6 +2912,42 @@ class SakuraLauncher:
         if launches_count >= 10: self._unlock_trophy("launches_10")
         if launches_count >= 50: self._unlock_trophy("launches_50")
         if launches_count >= 200: self._unlock_trophy("launches_200")
+
+    def _scan_minecraft_advancements(self):
+        """Lit les fichiers de succès (advancements) de toutes les sauvegardes
+        locales pour le pseudo/UUID courant, et débloque les trophées Sakura
+        correspondants (préfixe mc_) pour ceux marqués "done": true. Lancé en
+        arrière-plan (lecture disque), le déblocage lui-même revient sur le
+        thread principal via _unlock_trophy (sûr à appeler depuis after())."""
+        uname = self.username.get().strip()
+        if not uname:
+            return
+        uid = (self._ms_account.get("id") if self._ms_account else None) or offline_uuid(uname)
+
+        def run():
+            found = set()
+            saves_dir = MC_DIR / "saves"
+            try:
+                worlds = list(saves_dir.iterdir()) if saves_dir.exists() else []
+            except Exception:
+                worlds = []
+            for world in worlds:
+                adv_file = world / "advancements" / f"{uid}.json"
+                try:
+                    if adv_file.exists():
+                        data = json.loads(adv_file.read_text("utf-8"))
+                        for adv_id, info in data.items():
+                            if isinstance(info, dict) and info.get("done") and adv_id.startswith("minecraft:"):
+                                found.add(adv_id[len("minecraft:"):])
+                except Exception:
+                    continue
+            matched = [k for k in MC_ADVANCEMENTS if k in found]
+            if matched:
+                self.root.after(0, lambda: [self._unlock_trophy(f"mc_{k}") for k in matched])
+            else:
+                self.root.after(0, lambda: self._add_log(
+                    "Aucun nouveau succès Minecraft détecté dans les sauvegardes locales"))
+        threading.Thread(target=run, daemon=True).start()
 
     def _add_log(self, msg):
         ts=datetime.datetime.now().strftime("%H:%M:%S")

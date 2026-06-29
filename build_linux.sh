@@ -7,6 +7,8 @@ pip3 install -r requirements.txt
 
 pyinstaller --noconfirm --onedir \
     --name "SakuraLauncher" \
+    --icon "icon.png" \
+    --add-data "icon.png:." \
     --distpath "dist/linux" \
     sakura.py
 
@@ -36,10 +38,7 @@ exec "${HERE}/usr/bin/SakuraLauncher" "$@"
 EOF
     chmod +x "$APPDIR/AppRun"
 
-    # Remplace par une vraie icône .png si tu en as une (256x256 recommandé)
-    if [ -f "sakura_icon.png" ]; then
-        cp "../sakura_icon.png" "$APPDIR/sakura.png"
-    fi
+    cp "icon.png" "$APPDIR/sakura.png"
 
     appimagetool "$APPDIR" "dist/linux/SakuraLauncher-x86_64.AppImage"
     echo "AppImage terminé : dist/linux/SakuraLauncher-x86_64.AppImage"

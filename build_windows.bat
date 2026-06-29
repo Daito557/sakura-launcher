@@ -8,6 +8,8 @@ REM A lancer depuis ce dossier, avec sakura.py present a cote ou copie ici.
 pip install -r requirements.txt
 pyinstaller --noconfirm --onefile --windowed --noupx ^
     --name "SakuraLauncher" ^
+    --icon "icon.ico" ^
+    --add-data "icon.png;." ^
     --distpath "dist\windows" ^
     sakura.py
 

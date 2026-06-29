@@ -20,6 +20,14 @@ if getattr(sys, "frozen", False):
 else:
     BASE_DIR = Path(__file__).parent.resolve()
 
+def resource_path(name):
+    """Chemin vers un fichier embarqué (ex: icon.png) qui marche aussi bien
+    en script qu'en exe PyInstaller --onefile : dans ce dernier cas les
+    ressources sont extraites dans un dossier temporaire (sys._MEIPASS),
+    pas à côté de l'exe (contrairement à BASE_DIR)."""
+    base = Path(getattr(sys, "_MEIPASS", BASE_DIR))
+    return base / name
+
 MC_DIR     = BASE_DIR / "minecraft"
 MODS_DIR   = MC_DIR  / "mods"
 LOG_FILE   = BASE_DIR / "crash_log.txt"
@@ -295,6 +303,7 @@ class SakuraLauncher:
     def __init__(self):
         self.root = ctk.CTk()
         self.root.title("Sakura Launcher")
+        self._set_window_icon()
         self.root.geometry("1280x780")
         self.root.minsize(1100, 680)
         self.root.configure(fg_color=BG)
@@ -350,6 +359,21 @@ class SakuraLauncher:
         self._start_background_optimizer()
         self.username.trace_add("write", lambda *_: self._save_config())
         self.server_url.trace_add("write", lambda *_: self._save_config())
+
+    def _set_window_icon(self):
+        """Icône de fenêtre/taskbar, cross-platform via icon.png (PhotoImage
+        marche partout, contrairement à iconbitmap qui n'accepte un .ico
+        que sur Windows). Échec silencieux si le fichier n'est pas trouvé
+        (ex: build sans l'icône embarquée) — pas bloquant pour l'app."""
+        try:
+            from PIL import Image, ImageTk
+            png_path = resource_path("icon.png")
+            if png_path.exists():
+                img = Image.open(png_path)
+                self._icon_photo = ImageTk.PhotoImage(img)  # garder une réf
+                self.root.iconphoto(True, self._icon_photo)
+        except Exception:
+            pass
 
     # ── Layout ────────────────────────────────────────────────────────────────
 

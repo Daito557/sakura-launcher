@@ -7,6 +7,8 @@ pip3 install -r requirements.txt
 
 pyinstaller --noconfirm --windowed \
     --name "SakuraLauncher" \
+    --icon "icon.icns" \
+    --add-data "icon.png:." \
     --distpath "dist/macos" \
     sakura.py
 

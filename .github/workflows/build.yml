@@ -37,17 +37,17 @@ jobs:
         # --onefile : un seul .exe autonome (plus simple à distribuer, mais
         # plus susceptible d'être flaggé par Windows Defender que --onedir)
         run: |
-          pyinstaller --noconfirm --onefile --windowed --noupx --name SakuraLauncher --distpath dist sakura.py
+          pyinstaller --noconfirm --onefile --windowed --noupx --name SakuraLauncher --icon icon.ico --add-data "icon.png;." --distpath dist sakura.py
 
       - name: Build macOS
         if: matrix.name == 'macos'
         run: |
-          pyinstaller --noconfirm --windowed --name SakuraLauncher --distpath dist sakura.py
+          pyinstaller --noconfirm --windowed --name SakuraLauncher --icon icon.icns --add-data "icon.png:." --distpath dist sakura.py
 
       - name: Build Linux
         if: matrix.name == 'linux'
         run: |
-          pyinstaller --noconfirm --onedir --name SakuraLauncher --distpath dist sakura.py
+          pyinstaller --noconfirm --onedir --name SakuraLauncher --icon icon.png --add-data "icon.png:." --distpath dist sakura.py
 
       - name: Upload artefact
         uses: actions/upload-artifact@v4

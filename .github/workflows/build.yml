@@ -49,8 +49,43 @@ jobs:
         run: |
           pyinstaller --noconfirm --onedir --name SakuraLauncher --icon icon.png --add-data "icon.png:." --distpath dist sakura.py
 
+      # Zippe le build en un seul fichier par OS, pour un lien de
+      # téléchargement direct simple dans la Release GitHub (pas un dossier
+      # à explorer comme avec les artifacts).
+      - name: Zip (Windows)
+        if: matrix.name == 'windows'
+        run: Compress-Archive -Path dist\SakuraLauncher.exe -DestinationPath SakuraLauncher-windows.zip
+
+      - name: Zip (macOS)
+        if: matrix.name == 'macos'
+        run: cd dist && zip -r ../SakuraLauncher-macos.zip SakuraLauncher.app
+
+      - name: Zip (Linux)
+        if: matrix.name == 'linux'
+        run: cd dist && zip -r ../SakuraLauncher-linux.zip SakuraLauncher
+
       - name: Upload artefact
         uses: actions/upload-artifact@v4
         with:
           name: SakuraLauncher-${{ matrix.name }}
-          path: dist/
+          path: SakuraLauncher-${{ matrix.name }}.zip
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Télécharger tous les builds
+        uses: actions/download-artifact@v4
+        with:
+          pattern: SakuraLauncher-*
+          path: release-files
+          merge-multiple: true
+
+      - name: Publier la Release GitHub
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-files/*.zip
+          generate_release_notes: true

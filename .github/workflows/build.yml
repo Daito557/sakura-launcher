@@ -1,0 +1,54 @@
+name: Build Sakura Launcher (Windows / macOS / Linux)
+
+# Se déclenche sur chaque push de tag de version (ex: v2.1.0) ou manuellement
+# depuis l'onglet Actions de GitHub. Compile sur les 3 OS en parallèle via
+# des vraies machines Windows/macOS/Linux fournies par GitHub — pas besoin
+# de posséder un Mac pour obtenir un .app/.dmg.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            name: windows
+          - os: macos-latest
+            name: macos
+          - os: ubuntu-latest
+            name: linux
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Installer les dépendances
+        run: |
+          pip install -r requirements.txt
+
+      - name: Build Windows
+        if: matrix.name == 'windows'
+        run: |
+          pyinstaller --noconfirm --onedir --windowed --noupx --name SakuraLauncher --distpath dist sakura.py
+
+      - name: Build macOS
+        if: matrix.name == 'macos'
+        run: |
+          pyinstaller --noconfirm --windowed --name SakuraLauncher --distpath dist sakura.py
+
+      - name: Build Linux
+        if: matrix.name == 'linux'
+        run: |
+          pyinstaller --noconfirm --onedir --name SakuraLauncher --distpath dist sakura.py
+
+      - name: Upload artefact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SakuraLauncher-${{ matrix.name }}
+          path: dist/

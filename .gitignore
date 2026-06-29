@@ -1,0 +1,15 @@
+# Dossiers de jeu/données générés localement — pas de mods/saves/skins
+# d'un joueur particulier dans le repo
+minecraft/
+__pycache__/
+*.pyc
+
+# Fichiers de config/état locaux à un poste (pseudo, compte MS, stats...)
+config.json
+users_stats.json
+crash_log.txt
+
+# Sorties de build PyInstaller
+build/
+dist/
+*.spec

@@ -1,0 +1,8 @@
+customtkinter
+minecraft-launcher-lib
+pillow
+psutil
+py-cpuinfo
+pypresence
+pyinstaller
+windnd; sys_platform == "win32"

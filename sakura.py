@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import messagebox, filedialog, simpledialog
 import customtkinter as ctk
 import subprocess, threading, sys, json, shutil
-import datetime, traceback, urllib.request, os, socket, time
+import datetime, traceback, urllib.request, urllib.parse, os, socket, time
 from pathlib import Path
 import minecraft_launcher_lib
 
@@ -443,6 +443,7 @@ class SakuraLauncher:
         self._start_presence_loops()
         self._start_background_optimizer()
         self.root.after(3000, self._scan_minecraft_advancements)
+        self.root.after(3500, self._sync_trophies_from_server)
         self.username.trace_add("write", lambda *_: self._save_config())
         self.server_url.trace_add("write", lambda *_: self._save_config())
 
@@ -1268,7 +1269,8 @@ class SakuraLauncher:
         ctk.CTkButton(tr_c, text="🏆 Vérifier mes succès Minecraft", height=30,
                       fg_color=CARD2, border_color=BORDER, border_width=1,
                       text_color=TEXT2, font=ctk.CTkFont(size=11),
-                      command=self._scan_minecraft_advancements).pack(
+                      command=lambda: (self._scan_minecraft_advancements(),
+                                        self._sync_trophies_from_server())).pack(
                       fill="x", padx=12, pady=(2,6))
         self._trophy_grid = ctk.CTkFrame(tr_c, fg_color="transparent")
         self._trophy_grid.pack(fill="both", expand=True, padx=12, pady=(0,12))
@@ -2976,6 +2978,29 @@ class SakuraLauncher:
             else:
                 self.root.after(0, lambda: self._add_log(
                     "Aucun nouveau succès Minecraft détecté dans les sauvegardes locales"))
+        threading.Thread(target=run, daemon=True).start()
+
+    def _sync_trophies_from_server(self):
+        """Récupère les trophées déjà connus du serveur de présence pour ce
+        pseudo (ex: avancements détectés par le mod Neoforge côté serveur
+        multijoueur, invisibles depuis le scan local des saves) et les
+        débloque aussi localement, pour que "Mes trophées" reste à jour
+        même quand on joue en multijoueur plutôt qu'en solo."""
+        url = self.server_url.get().strip()
+        uname = self.username.get().strip()
+        if not url or not uname:
+            return
+        def run():
+            try:
+                req = urllib.request.Request(
+                    url.rstrip("/") + f"/trophies?username={urllib.parse.quote(uname)}")
+                data = json.loads(urllib.request.urlopen(req, timeout=5).read())
+                remote = data.get("trophies", {})
+            except Exception:
+                return
+            ids = [tid for tid in remote if tid in TROPHIES]
+            if ids:
+                self.root.after(0, lambda: [self._unlock_trophy(tid) for tid in ids])
         threading.Thread(target=run, daemon=True).start()
 
     def _add_log(self, msg):

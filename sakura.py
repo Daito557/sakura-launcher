@@ -1070,15 +1070,24 @@ class SakuraLauncher:
         lbl.pack(anchor="w", padx=12, pady=(0,6))
         return lbl
 
-    def _hook_drop_targets(self, targets, dest_dir, exts, on_complete, kind_label, trophy_id=None):
-        """Accroche windnd sur les widgets `targets` : tout fichier déposé
-        dont l'extension matche `exts` est copié dans dest_dir, puis
-        on_complete() est appelé pour rafraîchir l'UI. Ne fait rien si
-        windnd n'est pas dispo (HAS_DND False, ex: hors Windows). Si
-        trophy_id est fourni, débloque ce trophée au premier drop réussi."""
-        if not HAS_DND:
+    def _ensure_global_drop_hook(self):
+        """Accroche windnd UNE SEULE FOIS sur la fenêtre principale (qui ne
+        meurt jamais), au lieu de l'accrocher sur des widgets de page qui
+        sont détruits/recréés à chaque navigation. Windows recycle les
+        handles de fenêtre détruites : ré-accrocher sur des widgets éphémères
+        finit par pointer le hook sur la mauvaise fenêtre et fait crasher le
+        process (fermeture silencieuse du launcher, sans erreur Python).
+        La cible active (dossier dest, extensions...) est mise à jour par
+        _set_active_drop_zone() à chaque affichage de page."""
+        if not HAS_DND or getattr(self, "_drop_hook_installed", False):
             return
+        self._active_drop_zone = None  # (dest_dir, exts, on_complete, kind_label, trophy_id)
+
         def handler(files):
+            zone = self._active_drop_zone
+            if not zone:
+                return
+            dest_dir, exts, on_complete, kind_label, trophy_id = zone
             added, skipped = self._copy_dropped_files(files, dest_dir, exts)
             def upd():
                 on_complete()
@@ -1088,11 +1097,18 @@ class SakuraLauncher:
                 if added > 0 and trophy_id:
                     self._unlock_trophy(trophy_id)
             self.root.after(0, upd)
-        for t in targets:
-            try:
-                windnd.hook_dropfiles(t, func=handler)
-            except Exception:
-                pass
+
+        try:
+            windnd.hook_dropfiles(self.root, func=handler)
+            self._drop_hook_installed = True
+        except Exception as e:
+            write_log("Hook drop global", e)
+
+    def _set_active_drop_zone(self, dest_dir, exts, on_complete, kind_label, trophy_id=None):
+        """Définit la zone de dépôt active pour la page actuellement affichée."""
+        self._ensure_global_drop_hook()
+        if HAS_DND:
+            self._active_drop_zone = (dest_dir, exts, on_complete, kind_label, trophy_id)
 
     # ── MODS ──────────────────────────────────────────────────────────────────
 
@@ -1118,8 +1134,8 @@ class SakuraLauncher:
         self._mods_page_scroll.pack(fill="both", expand=True, padx=12, pady=(0,12))
         self._refresh_mods_page()
 
-        self._hook_drop_targets(
-            (card, self._mods_page_scroll), MODS_DIR, {".jar"},
+        self._set_active_drop_zone(
+            MODS_DIR, {".jar"},
             lambda: (self._refresh_mods_page(), self._refresh_mods_list()), "mod",
             trophy_id="mod_dropper")
 
@@ -1166,8 +1182,8 @@ class SakuraLauncher:
         self._rp_scroll.pack(fill="both", expand=True, padx=12, pady=(0,12))
         self._refresh_resource_page()
 
-        self._hook_drop_targets(
-            (card, self._rp_scroll), rp_dir, {".zip"},
+        self._set_active_drop_zone(
+            rp_dir, {".zip"},
             self._refresh_resource_page, "resource pack")
 
     def _refresh_resource_page(self):
@@ -1217,8 +1233,8 @@ class SakuraLauncher:
         self._sh_scroll.pack(fill="both", expand=True, padx=12, pady=(0,12))
         self._refresh_shaders_page()
 
-        self._hook_drop_targets(
-            (card, self._sh_scroll), sh_dir, {".zip"},
+        self._set_active_drop_zone(
+            sh_dir, {".zip"},
             self._refresh_shaders_page, "shaderpack",
             trophy_id="shader_installed")
 

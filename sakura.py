@@ -69,7 +69,7 @@ TROPHIES = {
     "launches_50":    ("⭐", "Vétéran",            "50 lancements depuis ce launcher"),
     "launches_200":   ("👑", "Légende",            "200 lancements depuis ce launcher"),
     "skin_custom":    ("🎨", "Stylé",              "Appliquer un skin personnalisé"),
-    "mod_dropper":    ("🧩", "Bricoleur",          "Installer un mod par glisser-déposer"),
+    "mod_dropper":    ("🧩", "Bricoleur",          "Installer un mod via la page Mods"),
     "shader_installed": ("✨", "Esthète",          "Installer un shaderpack"),
     "admin":          ("🛡", "Modérateur",         "Devenir admin du serveur de présence"),
 }

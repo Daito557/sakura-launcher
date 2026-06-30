@@ -2202,6 +2202,7 @@ class SakuraLauncher:
                 self.root.after(0, self._refresh_users_count_label)
                 self.root.after(0, self._safe_refresh_members_list)
                 self.root.after(0, lambda n=self._stats["launches"]: self._check_launch_trophies(n))
+                self._ensure_trophy_mod(vid)
                 self._report_launch_to_server(uname)
                 self._rpc_update(state=f"En train de jouer {vid} — {uname}")
                 if self.close_on_launch.get():
@@ -2823,6 +2824,22 @@ class SakuraLauncher:
         except Exception:
             pass
 
+    def _ensure_trophy_mod(self, version_id):
+        """Copie automatiquement sakura_trophy.jar dans mods/ si NeoForge est
+        détecté dans la version lancée et que le jar est distribué avec le launcher."""
+        if "neoforge" not in version_id.lower() and "neoforged" not in version_id.lower():
+            return
+        src = resource_path("sakura_trophy.jar")
+        if not src.exists():
+            return
+        dest = MODS_DIR / "sakura_trophy.jar"
+        try:
+            if not dest.exists() or dest.stat().st_size != src.stat().st_size:
+                shutil.copy2(src, dest)
+                self._add_log("Mod SakuraTrophy mis à jour dans mods/")
+        except Exception as e:
+            self._add_log(f"Impossible de copier sakura_trophy.jar : {e}")
+
     def _report_launch_to_server(self, username):
         """Signale un lancement au serveur de présence pour le classement
         (nombre de lancements par joueur, toutes machines confondues)."""
@@ -2926,21 +2943,32 @@ class SakuraLauncher:
 
         def run():
             found = set()
-            saves_dir = MC_DIR / "saves"
-            try:
-                worlds = list(saves_dir.iterdir()) if saves_dir.exists() else []
-            except Exception:
-                worlds = []
-            for world in worlds:
-                adv_file = world / "advancements" / f"{uid}.json"
+            # Cherche dans le dossier du launcher ET dans .minecraft standard
+            dot_mc = Path.home() / "AppData" / "Roaming" / ".minecraft"
+            saves_dirs = [MC_DIR / "saves", dot_mc / "saves"]
+            worlds = []
+            for saves_dir in saves_dirs:
                 try:
-                    if adv_file.exists():
-                        data = json.loads(adv_file.read_text("utf-8"))
-                        for adv_id, info in data.items():
-                            if isinstance(info, dict) and info.get("done") and adv_id.startswith("minecraft:"):
-                                found.add(adv_id[len("minecraft:"):])
+                    if saves_dir.exists():
+                        worlds.extend(saves_dir.iterdir())
                 except Exception:
-                    continue
+                    pass
+            for world in worlds:
+                # Minecraft moderne : saves/<monde>/advancements/<uuid>.json
+                # Minecraft ancien : saves/<monde>/players/advancements/<uuid>.json
+                candidates = [
+                    world / "advancements" / f"{uid}.json",
+                    world / "players" / "advancements" / f"{uid}.json",
+                ]
+                for adv_file in candidates:
+                    try:
+                        if adv_file.exists():
+                            data = json.loads(adv_file.read_text("utf-8"))
+                            for adv_id, info in data.items():
+                                if isinstance(info, dict) and info.get("done") and adv_id.startswith("minecraft:"):
+                                    found.add(adv_id[len("minecraft:"):])
+                    except Exception:
+                        continue
             matched = [k for k in MC_ADVANCEMENTS if k in found]
             if matched:
                 self.root.after(0, lambda: [self._unlock_trophy(f"mc_{k}") for k in matched])

@@ -230,6 +230,25 @@ def ping_host(host="1.1.1.1", port=53, timeout=1):
         return int((datetime.datetime.now()-t).total_seconds()*1000)
     except: return None
 
+def cds_jvm_flags(version_id):
+    """AppCDS dynamique : la JVM met en cache les métadonnées de classes
+    chargées (Minecraft + mods) dans un fichier .jsa propre à la version.
+    Au 1er lancement, le cache n'existe pas encore -> on demande à la JVM de
+    l'écrire à la fermeture (ArchiveClassesAtExit). Aux lancements suivants,
+    on le réutilise (-Xshare:auto), ce qui accélère nettement le démarrage
+    de la JVM (chargement de classes déjà résolu). Sans risque : si le cache
+    devient invalide (mods ajoutés/retirés, mise à jour), -Xshare:auto le
+    détecte et l'ignore silencieusement au lieu de planter."""
+    cds_dir = MC_DIR / "versions" / version_id
+    archive = cds_dir / "sakura_cds.jsa"
+    try:
+        cds_dir.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        return []
+    if archive.exists():
+        return [f"-XX:SharedArchiveFile={archive}", "-Xshare:auto"]
+    return [f"-XX:ArchiveClassesAtExit={archive}", "-Xlog:cds=off"]
+
 def aikar_jvm_flags(ram_mb):
     """Flags JVM 'Aikar' — référence dans la communauté Minecraft pour
     réduire les freezes/lags liés au garbage collector, adaptés à la RAM
@@ -2180,6 +2199,7 @@ class SakuraLauncher:
 
                 ram_xmx = int(self.ram_mb.get())
                 jvm_args = aikar_jvm_flags(ram_xmx)
+                jvm_args += cds_jvm_flags(vid)
 
                 # Pointe vers le skin local pour CustomSkinLoader si dispo
                 active_skin = MC_DIR / "active_skin.png"

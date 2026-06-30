@@ -60,6 +60,12 @@ def record_launch(username):
     save_stats(d)
     return d
 
+# ── Cache d'avatars Minecraft (têtes de joueurs) pour le classement ──────────
+# clé = (pseudo en minuscules, taille en px) -> image PIL déjà redimensionnée.
+# Persiste pour toute la durée de vie de l'app, pas de TTL (les skins de
+# joueurs offline ne changent pas, et un relance du launcher revide le cache).
+_AVATAR_CACHE = {}
+
 # ── Trophées (système partagé via le serveur de présence) ────────────────────
 # Catalogue fixe : id -> (icône, nom, description). L'ordre ici est l'ordre
 # d'affichage dans la page Classement.
@@ -1320,8 +1326,33 @@ class SakuraLauncher:
                 rows = data.get("leaderboard", [])
             except Exception:
                 rows = None
+            # Pré-charge les têtes de joueurs (réseau + décodage PIL) ici, en
+            # arrière-plan, avant de rendre la liste — évite de bloquer l'UI.
+            if rows:
+                for row in rows[:50]:
+                    self._fetch_player_head(row.get("username", "?"))
             self.root.after(0, lambda: self._render_leaderboard(rows))
         threading.Thread(target=run, daemon=True).start()
+
+    def _fetch_player_head(self, username, size=24):
+        """Télécharge (et met en cache) la tête du skin Minecraft du joueur,
+        via Minotar — fonctionne aussi pour les comptes offline (skin par
+        défaut Steve/Alex si le pseudo n'existe pas chez Mojang)."""
+        key = (username.lower(), size)
+        if key in _AVATAR_CACHE:
+            return _AVATAR_CACHE[key]
+        try:
+            from PIL import Image
+            import io
+            url = f"https://minotar.net/avatar/{urllib.parse.quote(username)}/{size}.png"
+            data = urllib.request.urlopen(url, timeout=4).read()
+            img = Image.open(io.BytesIO(data)).convert("RGBA").resize(
+                (size, size), Image.NEAREST)
+            _AVATAR_CACHE[key] = img
+            return img
+        except Exception:
+            _AVATAR_CACHE[key] = None
+            return None
 
     def _render_leaderboard(self, rows):
         for w in self._lb_scroll.winfo_children(): w.destroy()
@@ -1344,6 +1375,15 @@ class SakuraLauncher:
             ctk.CTkLabel(r, text=rank_txt, width=36,
                          font=ctk.CTkFont(size=13, weight="bold"),
                          text_color=ACCENT2 if i < 3 else TEXT3).pack(side="left", padx=(8,4))
+
+            head_img = _AVATAR_CACHE.get((name.lower(), 24))
+            if head_img is not None:
+                head_ck = ctk.CTkImage(light_image=head_img, dark_image=head_img, size=(24, 24))
+                ctk.CTkLabel(r, image=head_ck, text="").pack(side="left", padx=(0, 6))
+            else:
+                ctk.CTkLabel(r, text="🧑", width=24,
+                             font=ctk.CTkFont(size=14)).pack(side="left", padx=(0, 6))
+
             ctk.CTkLabel(r, text=name + (" (vous)" if name == current else ""),
                          text_color=TEXT, font=ctk.CTkFont(size=12,
                          weight="bold" if name == current else "normal")).pack(side="left")

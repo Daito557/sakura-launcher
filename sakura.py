@@ -6,11 +6,6 @@ import datetime, traceback, urllib.request, os, socket, time
 from pathlib import Path
 import minecraft_launcher_lib
 
-try:
-    import windnd  # glisser-déposer de fichiers natif Windows (optionnel)
-    HAS_DND = True
-except ImportError:
-    HAS_DND = False
 
 APP_VERSION = "2.1.0"
 
@@ -1073,61 +1068,36 @@ class SakuraLauncher:
         return added, skipped
 
     def _build_drop_label(self, card, kind_desc):
-        """Crée le label d'invite (ou d'avertissement, selon dispo de windnd
-        et l'OS) au-dessus d'une zone de glisser-déposer."""
-        if HAS_DND:
-            text, color = f"📥 Glisse des fichiers {kind_desc} ici pour les installer", TEXT2
-        elif sys.platform == "win32":
-            text = ("⚠ Glisser-déposer indisponible : installe le module avec "
-                     "\"pip install windnd\" puis relance le launcher")
-            color = ORANGE
-        else:
-            text = ("⚠ Glisser-déposer indisponible sur cet OS — utilise "
-                     "\"📁 Ouvrir dossier\" pour ajouter des fichiers manuellement")
-            color = ORANGE
-        lbl = ctk.CTkLabel(card, text=text, text_color=color, font=ctk.CTkFont(size=12))
+        """Label d'invite au-dessus du bouton d'ajout de fichiers."""
+        text = f"📥 Utilise \"Ajouter des fichiers\" pour installer des {kind_desc}"
+        lbl = ctk.CTkLabel(card, text=text, text_color=TEXT2, font=ctk.CTkFont(size=12))
         lbl.pack(anchor="w", padx=12, pady=(0,6))
         return lbl
 
-    def _ensure_global_drop_hook(self):
-        """Accroche windnd UNE SEULE FOIS sur la fenêtre principale (qui ne
-        meurt jamais), au lieu de l'accrocher sur des widgets de page qui
-        sont détruits/recréés à chaque navigation. Windows recycle les
-        handles de fenêtre détruites : ré-accrocher sur des widgets éphémères
-        finit par pointer le hook sur la mauvaise fenêtre et fait crasher le
-        process (fermeture silencieuse du launcher, sans erreur Python).
-        La cible active (dossier dest, extensions...) est mise à jour par
-        _set_active_drop_zone() à chaque affichage de page."""
-        if not HAS_DND or getattr(self, "_drop_hook_installed", False):
-            return
-        self._active_drop_zone = None  # (dest_dir, exts, on_complete, kind_label, trophy_id)
-
-        def handler(files):
-            zone = self._active_drop_zone
-            if not zone:
+    def _add_files_button(self, parent, dest_dir, exts, on_complete, kind_label, trophy_id=None):
+        """Bouton "Ajouter des fichiers" basé sur le dialogue de fichiers
+        standard Tkinter (filedialog), plutôt que sur un hook natif de
+        glisser-déposer (windnd). Le hook natif provoquait des fermetures
+        silencieuses du launcher sur certaines machines (conflit avec le
+        subclassing de fenêtre de CustomTkinter). filedialog ne touche à
+        aucune fenêtre native par hook : zéro risque de crash."""
+        pattern = " ".join(f"*{e}" for e in exts)
+        def pick():
+            paths = filedialog.askopenfilenames(
+                title=f"Choisir des fichiers {kind_label}",
+                filetypes=[(kind_label, pattern), ("Tous les fichiers", "*.*")])
+            if not paths:
                 return
-            dest_dir, exts, on_complete, kind_label, trophy_id = zone
-            added, skipped = self._copy_dropped_files(files, dest_dir, exts)
-            def upd():
-                on_complete()
-                msg = f"{added} {kind_label}(s) ajouté(s) par glisser-déposer"
-                if skipped: msg += f" ({skipped} fichier(s) ignoré(s))"
-                self._add_log(msg)
-                if added > 0 and trophy_id:
-                    self._unlock_trophy(trophy_id)
-            self.root.after(0, upd)
-
-        try:
-            windnd.hook_dropfiles(self.root, func=handler)
-            self._drop_hook_installed = True
-        except Exception as e:
-            write_log("Hook drop global", e)
-
-    def _set_active_drop_zone(self, dest_dir, exts, on_complete, kind_label, trophy_id=None):
-        """Définit la zone de dépôt active pour la page actuellement affichée."""
-        self._ensure_global_drop_hook()
-        if HAS_DND:
-            self._active_drop_zone = (dest_dir, exts, on_complete, kind_label, trophy_id)
+            added, skipped = self._copy_dropped_files(paths, dest_dir, exts)
+            on_complete()
+            msg = f"{added} {kind_label}(s) ajouté(s)"
+            if skipped: msg += f" ({skipped} fichier(s) ignoré(s))"
+            self._add_log(msg)
+            if added > 0 and trophy_id:
+                self._unlock_trophy(trophy_id)
+        ctk.CTkButton(parent, text="📤 Ajouter des fichiers", height=30, width=160,
+                      fg_color=CARD2, border_color=BORDER, border_width=1,
+                      text_color=TEXT2, command=pick).pack(side="left", padx=4)
 
     # ── MODS ──────────────────────────────────────────────────────────────────
 
@@ -1144,19 +1114,16 @@ class SakuraLauncher:
         ctk.CTkButton(top, text="🔄 Actualiser", height=30, width=110,
                       fg_color=CARD2, border_color=BORDER, border_width=1,
                       text_color=TEXT2, command=self._refresh_mods_page).pack(side="left")
+        self._add_files_button(
+            top, MODS_DIR, {".jar"},
+            lambda: (self._refresh_mods_page(), self._refresh_mods_list()), "mod",
+            trophy_id="mod_dropper")
 
-        # Zone de glisser-déposer : dépose un ou plusieurs .jar n'importe où
-        # dans le cadre ci-dessous pour les copier dans le dossier mods/.
         self._build_drop_label(card, ".jar")
 
         self._mods_page_scroll = ctk.CTkScrollableFrame(card, fg_color="transparent")
         self._mods_page_scroll.pack(fill="both", expand=True, padx=12, pady=(0,12))
         self._refresh_mods_page()
-
-        self._set_active_drop_zone(
-            MODS_DIR, {".jar"},
-            lambda: (self._refresh_mods_page(), self._refresh_mods_list()), "mod",
-            trophy_id="mod_dropper")
 
     def _refresh_mods_page(self):
         for w in self._mods_page_scroll.winfo_children(): w.destroy()
@@ -1194,16 +1161,15 @@ class SakuraLauncher:
         ctk.CTkButton(top, text="🔄 Actualiser", height=30, width=110,
                       fg_color=CARD2, border_color=BORDER, border_width=1,
                       text_color=TEXT2, command=self._refresh_resource_page).pack(side="left")
+        self._add_files_button(
+            top, rp_dir, {".zip"},
+            self._refresh_resource_page, "resource pack")
 
         self._build_drop_label(card, ".zip")
 
         self._rp_scroll = ctk.CTkScrollableFrame(card, fg_color="transparent")
         self._rp_scroll.pack(fill="both", expand=True, padx=12, pady=(0,12))
         self._refresh_resource_page()
-
-        self._set_active_drop_zone(
-            rp_dir, {".zip"},
-            self._refresh_resource_page, "resource pack")
 
     def _refresh_resource_page(self):
         for w in self._rp_scroll.winfo_children(): w.destroy()
@@ -1245,17 +1211,16 @@ class SakuraLauncher:
         ctk.CTkButton(top, text="🔄 Actualiser", height=30, width=110,
                       fg_color=CARD2, border_color=BORDER, border_width=1,
                       text_color=TEXT2, command=self._refresh_shaders_page).pack(side="left")
+        self._add_files_button(
+            top, sh_dir, {".zip"},
+            self._refresh_shaders_page, "shaderpack",
+            trophy_id="shader_installed")
 
         self._build_drop_label(card, ".zip")
 
         self._sh_scroll = ctk.CTkScrollableFrame(card, fg_color="transparent")
         self._sh_scroll.pack(fill="both", expand=True, padx=12, pady=(0,12))
         self._refresh_shaders_page()
-
-        self._set_active_drop_zone(
-            sh_dir, {".zip"},
-            self._refresh_shaders_page, "shaderpack",
-            trophy_id="shader_installed")
 
     def _refresh_shaders_page(self):
         for w in self._sh_scroll.winfo_children(): w.destroy()

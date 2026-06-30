@@ -2999,8 +2999,27 @@ class SakuraLauncher:
             except Exception:
                 return
             ids = [tid for tid in remote if tid in TROPHIES]
-            if ids:
-                self.root.after(0, lambda: [self._unlock_trophy(tid) for tid in ids])
+            # Les "mc_*" absents de la réponse serveur ont été retirés en jeu
+            # (ex: "/advancement revoke ... everything") : on les retire
+            # aussi localement, contrairement aux autres trophées (lancements,
+            # admin, skin...) qui restent gérés uniquement par le launcher.
+            removed = [tid for tid in self._trophies
+                       if tid.startswith("mc_") and tid not in remote]
+
+            def apply():
+                changed = False
+                for tid in removed:
+                    if self._trophies.pop(tid, None) is not None:
+                        changed = True
+                for tid in ids:
+                    self._unlock_trophy(tid)
+                if changed:
+                    save_trophies(self._trophies)
+                    grid = getattr(self, "_trophy_grid", None)
+                    if grid is not None:
+                        try: self._refresh_trophy_grid()
+                        except Exception: pass
+            self.root.after(0, apply)
         threading.Thread(target=run, daemon=True).start()
 
     def _add_log(self, msg):

@@ -150,6 +150,30 @@ class Handler(BaseHTTPRequestHandler):
                     _save_data()
             self._send_json(200, {"ok": True, "new": is_new})
 
+        elif self.path == "/trophy/sync":
+            # Remplace l'ensemble des trophées "mc_*" (avancements Minecraft)
+            # d'un joueur par la liste fournie, qui reflète son état RÉEL en
+            # jeu à l'instant T (envoyée par le mod à chaque connexion). Les
+            # avancements retirés via "/advancement revoke" en jeu sont donc
+            # bien effacés ici aussi, ce qu'un simple POST /trophy ne permet
+            # pas (lui ne fait qu'ajouter). Les trophées non-"mc_" (lancements,
+            # admin, skin...) ne sont jamais touchés par cette route.
+            data = self._read_json()
+            username = str(data.get("username", "")).strip()
+            current_ids = data.get("trophy_ids", [])
+            if not username or not isinstance(current_ids, list):
+                self._send_json(400, {"ok": False, "error": "username/trophy_ids manquant"})
+                return
+            current_set = {str(t) for t in current_ids if str(t).startswith("mc_")}
+            with _lock:
+                user_trophies = _trophies.setdefault(username, {})
+                kept = {k: v for k, v in user_trophies.items() if not k.startswith("mc_")}
+                for tid in current_set:
+                    kept[tid] = user_trophies.get(tid, time.time())
+                _trophies[username] = kept
+                _save_data()
+            self._send_json(200, {"ok": True, "count": len(current_set)})
+
         else:
             self._send_json(404, {"ok": False, "error": "route inconnue"})
 

@@ -347,17 +347,34 @@ ctk.set_default_color_theme("blue")
 if sys.platform == "win32":
     try:
         import ctypes
-        ctypes.windll.shcore.SetProcessDpiAwareness(1)
+        ctypes.windll.shcore.SetProcessDpiAwareness(2)  # Per-monitor DPI aware
     except Exception:
         try:
-            import ctypes
-            ctypes.windll.user32.SetProcessDPIAware()
+            ctypes.windll.shcore.SetProcessDpiAwareness(1)
         except Exception:
-            pass
-# On laisse CustomTkinter détecter automatiquement l'échelle Windows de
-# chaque PC (100%, 125%, 150%...) maintenant que l'appli est DPI aware —
-# forcer une valeur fixe ici rendait l'interface trop petite ou trop grande
-# selon l'échelle d'affichage configurée chez l'utilisateur.
+            try:
+                ctypes.windll.user32.SetProcessDPIAware()
+            except Exception:
+                pass
+
+# Calcule le scaling réel Windows (100%=1.0, 125%=1.25, 150%=1.5...)
+# et aligne CTk dessus pour que l'interface soit nette sur tous les écrans.
+def _get_win_scale():
+    try:
+        import ctypes
+        dc = ctypes.windll.user32.GetDC(0)
+        dpi = ctypes.windll.gdi32.GetDeviceCaps(dc, 88)  # LOGPIXELSX
+        ctypes.windll.user32.ReleaseDC(0, dc)
+        return round(dpi / 96.0, 2)
+    except Exception:
+        return 1.0
+
+_win_scale = _get_win_scale() if sys.platform == "win32" else 1.0
+# On applique le scaling CTk seulement si Windows est >100%
+# pour corriger le layout sans sur-zoomer sur les écrans 100%.
+if _win_scale > 1.0:
+    ctk.set_widget_scaling(1.0 / _win_scale)
+    ctk.set_window_scaling(1.0 / _win_scale)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

@@ -428,25 +428,54 @@ def cds_jvm_flags(version_id):
         return [f"-XX:SharedArchiveFile={archive}", "-Xshare:auto"]
     return [f"-XX:ArchiveClassesAtExit={archive}", "-Xlog:cds=off"]
 
-def aikar_jvm_flags(ram_mb):
-    """Flags JVM 'Aikar' — référence dans la communauté Minecraft pour
-    réduire les freezes/lags liés au garbage collector, adaptés à la RAM
-    allouée (en dessous de 12 Go le G1 region size est plus petit).
+def find_java21() -> str | None:
+    """Cherche un Java 21+ dans les emplacements standards (Minecraft runtime,
+    Program Files, Homebrew…) et retourne le chemin vers java(.exe) ou None."""
+    candidates: list[Path] = []
+    if sys.platform == "win32":
+        # Runtime embarqué par le launcher Minecraft officiel
+        mc_runtime = Path.home() / "AppData" / "Roaming" / ".minecraft" / "runtime"
+        if mc_runtime.exists():
+            for d in mc_runtime.iterdir():
+                if d.is_dir():
+                    for sub in d.rglob("bin/java.exe"):
+                        candidates.append(sub)
+        for pf in [r"C:\Program Files\Java", r"C:\Program Files\Eclipse Adoptium",
+                   r"C:\Program Files\Microsoft", r"C:\Program Files\Eclipse Foundation"]:
+            p = Path(pf)
+            if p.exists():
+                for sub in p.rglob("bin/java.exe"):
+                    candidates.append(sub)
+    elif sys.platform == "darwin":
+        for brew in [Path("/opt/homebrew/opt"), Path("/usr/local/opt")]:
+            if brew.exists():
+                for sub in brew.glob("openjdk*/bin/java"):
+                    candidates.append(sub)
+        candidates += list(Path("/Library/Java/JavaVirtualMachines").rglob("Contents/Home/bin/java"))
+    else:
+        for d in [Path("/usr/lib/jvm"), Path("/usr/local/lib/jvm")]:
+            if d.exists():
+                for sub in d.rglob("bin/java"):
+                    candidates.append(sub)
+    for java in candidates:
+        if not java.exists():
+            continue
+        try:
+            out = subprocess.check_output([str(java), "-version"],
+                                          stderr=subprocess.STDOUT, timeout=3).decode(errors="replace")
+            import re
+            m = re.search(r'version "(\d+)', out)
+            if m and int(m.group(1)) >= 21:
+                return str(java)
+        except Exception:
+            continue
+    return None
 
-    Deux ajustements par rapport aux flags Aikar "stricts", pour que le jeu
-    démarre vite sans pénaliser le jeu une fois lancé :
-    - Xms plus petit que Xmx : la JVM alloue/commit un tas réduit au
-      démarrage et grandit ensuite à la demande, au lieu de réserver tout
-      le tas (ex. 12 Go) avant même de charger Minecraft.
-    - Pas d'AlwaysPreTouch : ce flag force la JVM à toucher (mettre à zéro)
-      chaque page mémoire du tas dès le lancement — avec une grosse RAM
-      allouée ça ajoute plusieurs secondes avant que le jeu démarre. On
-      perd un peu de perf en tout début de partie (premiers GC) contre un
-      lancement nettement plus rapide.
-    """
+
+def aikar_jvm_flags(ram_mb):
     region   = "4M" if ram_mb < 12288 else "8M"
     xms_mb   = min(2048, max(1024, ram_mb // 4))
-    return [
+    flags = [
         f"-Xms{xms_mb}m", f"-Xmx{ram_mb}m",
         "-XX:+UseG1GC", "-XX:+ParallelRefProcEnabled",
         "-XX:MaxGCPauseMillis=200", "-XX:+UnlockExperimentalVMOptions",
@@ -461,7 +490,30 @@ def aikar_jvm_flags(ram_mb):
         "-XX:CICompilerCount=2",
         "-Dusing.aikars.flags=https://mcflags.emc.gs",
         "-Dfile.encoding=UTF-8",
+        # Accélère le chargement des classes (tiered compilation rapide)
+        "-XX:+TieredCompilation", "-XX:TieredStopAtLevel=1",
+        # Réduit la latence réseau Netty (utilisé par Minecraft)
+        "-Djava.net.preferIPv4Stack=true",
+        # Désactive les vérifications de bytecode inutiles en prod
+        "-XX:-OmitStackTraceInFastThrow",
     ]
+    # Flags supplémentaires Java 21+ (NeoForge 1.21 tourne sur Java 21)
+    try:
+        import re
+        out = subprocess.check_output(["java", "-version"],
+                                      stderr=subprocess.STDOUT, timeout=3).decode(errors="replace")
+        m = re.search(r'version "(\d+)', out)
+        if m and int(m.group(1)) >= 21:
+            flags += [
+                # Compact object headers (Project Lilliput, réduit la RAM objet ~10 %)
+                "-XX:+UnlockExperimentalVMOptions", "-XX:+UseCompactObjectHeaders",
+                # Meilleure réponse GC sur Java 21
+                "-XX:+UseTransparentHugePages" if sys.platform == "linux" else "",
+            ]
+            flags = [f for f in flags if f]
+    except Exception:
+        pass
+    return flags
 
 def boost_process_priority(pid, level="high"):
     """Donne au process Minecraft une priorité CPU plus élevée que les
@@ -561,6 +613,8 @@ class StatRow(ctk.CTkFrame):
 
 class SakuraLauncher:
     def __init__(self):
+        ctk.set_widget_scaling(0.75)
+        ctk.set_window_scaling(0.75)
         self.root = ctk.CTk()
         self.root.title("Sakura Launcher")
         self._set_window_icon()
@@ -2392,6 +2446,7 @@ class SakuraLauncher:
                     jvm_args.append(
                         f"-Dcustomskinloader.skin={active_skin.as_uri()}")
 
+                java21 = find_java21()
                 options = {
                     "username":         uname,
                     "uuid":             uid,
@@ -2402,6 +2457,8 @@ class SakuraLauncher:
                     "launcherVersion":  APP_VERSION,
                     "nativesDirectory": str(MC_DIR/"versions"/vid/"natives"),
                 }
+                if java21:
+                    options["executablePath"] = java21
                 cmd = minecraft_launcher_lib.command.get_minecraft_command(
                     version=vid, minecraft_directory=str(MC_DIR), options=options)
                 flags = subprocess.CREATE_NO_WINDOW if sys.platform=="win32" else 0

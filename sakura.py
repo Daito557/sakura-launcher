@@ -980,7 +980,7 @@ class SakuraLauncher:
                       command=self._launch_current).pack(anchor="w")
 
         # Version selector (bas droite du hero)
-        ver_sel = ctk.CTkFrame(hero, fg_color="#1a1535cc", corner_radius=8)
+        ver_sel = ctk.CTkFrame(hero, fg_color="#1a1535", corner_radius=8)
         ver_sel.place(relx=1, rely=1, x=-16, y=-16, anchor="se")
         ctk.CTkLabel(ver_sel, text="Version sélectionnée",
                      font=ctk.CTkFont(size=10), text_color=TEXT3).pack(padx=12, pady=(6,2))

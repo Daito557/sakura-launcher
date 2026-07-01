@@ -74,6 +74,55 @@ jobs:
           (cd dist && zip -r ../SakuraLauncher-linux.zip SakuraLauncher)
           (cd dist && zip -r ../SakuraLauncher-LowPC-linux.zip SakuraLauncher-LowPC)
 
+      # ── Paquet .deb (Linux seulement) ─────────────────────────────────────
+      - name: Build .deb (Linux)
+        if: matrix.name == 'linux'
+        run: |
+          PKG=sakura-launcher_amd64
+          mkdir -p $PKG/DEBIAN
+          mkdir -p $PKG/usr/lib/sakura-launcher
+          mkdir -p $PKG/usr/bin
+          mkdir -p $PKG/usr/share/applications
+          mkdir -p $PKG/usr/share/icons/hicolor/256x256/apps
+
+          # Copier le dossier onedir
+          cp -r dist/SakuraLauncher/* $PKG/usr/lib/sakura-launcher/
+
+          # Icône
+          cp icon.png $PKG/usr/share/icons/hicolor/256x256/apps/sakura-launcher.png
+
+          # Lanceur shell
+          cat > $PKG/usr/bin/sakura-launcher << 'SHELL'
+          #!/bin/sh
+          exec /usr/lib/sakura-launcher/SakuraLauncher "$@"
+          SHELL
+          chmod +x $PKG/usr/bin/sakura-launcher
+
+          # Entrée .desktop
+          cat > $PKG/usr/share/applications/sakura-launcher.desktop << 'DESKTOP'
+          [Desktop Entry]
+          Name=Sakura Launcher
+          Comment=Lanceur Minecraft Sakura
+          Exec=/usr/lib/sakura-launcher/SakuraLauncher
+          Icon=sakura-launcher
+          Terminal=false
+          Type=Application
+          Categories=Game;
+          DESKTOP
+
+          # Fichier de contrôle deb
+          cat > $PKG/DEBIAN/control << 'CONTROL'
+          Package: sakura-launcher
+          Version: 2.1.5
+          Architecture: amd64
+          Maintainer: Sakura <boisniert455@gmail.com>
+          Description: Sakura Minecraft Launcher
+           Lanceur Minecraft personnalisé avec interface Sakura.
+          Depends: libgtk-3-0, libglib2.0-0
+          CONTROL
+
+          dpkg-deb --build $PKG SakuraLauncher-linux.deb
+
       - name: Upload artefacts
         uses: actions/upload-artifact@v4
         with:
@@ -81,6 +130,7 @@ jobs:
           path: |
             SakuraLauncher-${{ matrix.name }}.zip
             SakuraLauncher-LowPC-${{ matrix.name }}.zip
+            SakuraLauncher-linux.deb
 
   release:
     needs: build
@@ -99,5 +149,7 @@ jobs:
       - name: Publier la Release GitHub
         uses: softprops/action-gh-release@v2
         with:
-          files: release-files/*.zip
+          files: |
+            release-files/*.zip
+            release-files/*.deb
           generate_release_notes: true

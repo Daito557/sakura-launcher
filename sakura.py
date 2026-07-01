@@ -461,8 +461,10 @@ def find_java21() -> str | None:
         if not java.exists():
             continue
         try:
+            flags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
             out = subprocess.check_output([str(java), "-version"],
-                                          stderr=subprocess.STDOUT, timeout=3).decode(errors="replace")
+                                          stderr=subprocess.STDOUT, timeout=3,
+                                          creationflags=flags).decode(errors="replace")
             import re
             m = re.search(r'version "(\d+)', out)
             if m and int(m.group(1)) >= 21:

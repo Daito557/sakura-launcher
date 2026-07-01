@@ -593,8 +593,6 @@ class StatRow(ctk.CTkFrame):
 
 class SakuraLauncher:
     def __init__(self):
-        ctk.set_widget_scaling(0.75)
-        ctk.set_window_scaling(0.75)
         self.root = ctk.CTk()
         self.root.title("Sakura Launcher")
         self._set_window_icon()

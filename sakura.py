@@ -898,131 +898,112 @@ class SakuraLauncher:
             text_color=TEXT, font=ctk.CTkFont(size=12, weight="bold"),
             anchor="w", height=36)
 
-        # Hero — image de fond château
-        HERO_H = 220
-        hero = ctk.CTkFrame(scroll, fg_color="#0a0814", corner_radius=14,
+        # ── Rangée haute : Hero (gauche) + Outils rapides / Statut (droite) ──
+        HERO_H = 260
+        top_row = ctk.CTkFrame(scroll, fg_color="transparent")
+        top_row.pack(fill="x", padx=20, pady=(16, 8))
+
+        # ── Hero (gauche, image château) ──────────────────────────────────
+        hero = ctk.CTkFrame(top_row, fg_color="#0a0814", corner_radius=14,
                              border_width=1, border_color=BORDER, height=HERO_H)
-        hero.pack(fill="x", padx=20, pady=(16,10))
+        hero.pack(side="left", fill="both", expand=True, padx=(0, 8))
         hero.pack_propagate(False)
         self._accueil_hero = hero
 
-        # Canvas pour l'image de fond
         hero_canvas = tk.Canvas(hero, highlightthickness=0, bd=0, bg="#0a0814")
         hero_canvas.place(relx=0, rely=0, relwidth=1, relheight=1)
 
         def _load_hero_bg(canvas, h=HERO_H):
             try:
-                from PIL import Image, ImageTk, ImageEnhance, ImageFilter
+                from PIL import Image, ImageTk, ImageEnhance, ImageDraw
                 bg_path = resource_path("background.jpg")
                 if not bg_path.exists():
                     bg_path = BASE_DIR / "background.jpg"
                 if not bg_path.exists():
                     return
-                img = Image.open(bg_path)
-                # Resize pour remplir la largeur tout en gardant les proportions
                 canvas.update_idletasks()
-                w = canvas.winfo_width() or 900
+                w = canvas.winfo_width() or 700
+                img = Image.open(bg_path)
                 ratio = w / img.width
                 img = img.resize((w, max(h, int(img.height * ratio))), Image.LANCZOS)
-                # Recadre centré sur la hauteur voulue
                 if img.height > h:
                     top = (img.height - h) // 2
                     img = img.crop((0, top, w, top + h))
-                # Assombrir légèrement pour lisibilité du texte
-                img = ImageEnhance.Brightness(img).enhance(0.55)
-                # Dégradé sombre sur la gauche (pour le texte)
-                from PIL import ImageDraw
-                overlay = Image.new("RGBA", img.size, (0,0,0,0))
+                img = ImageEnhance.Brightness(img).enhance(0.6)
+                overlay = Image.new("RGBA", img.size, (0, 0, 0, 0))
                 draw = ImageDraw.Draw(overlay)
-                for i in range(min(420, w)):
-                    alpha = int(180 * (1 - i / 420))
+                for i in range(min(500, w)):
+                    alpha = int(200 * (1 - i / 500))
                     draw.line([(i, 0), (i, h)], fill=(10, 8, 20, alpha))
-                img = img.convert("RGBA")
-                img = Image.alpha_composite(img, overlay).convert("RGB")
+                img = Image.alpha_composite(img.convert("RGBA"), overlay).convert("RGB")
                 photo = ImageTk.PhotoImage(img)
-                canvas._bg_photo = photo  # garder la référence
+                canvas._bg_photo = photo
+                canvas.delete("all")
                 canvas.create_image(0, 0, anchor="nw", image=photo)
-                # Logo Sakura (carré violet) en haut à gauche
-                logo_size = 44
-                lx, ly = 28, 24
-                canvas.create_rectangle(lx, ly, lx+logo_size, ly+logo_size,
-                                        fill="#7c3aed", outline="#a78bfa", width=2)
-                canvas.create_text(lx+logo_size//2, ly+logo_size//2,
-                                   text="S", fill="white",
-                                   font=("Arial", 22, "bold"))
-                # Texte "SAKURA LAUNCHER"
-                canvas.create_text(lx+logo_size+10, ly+8,
-                                   text="SAKURA", fill="white",
-                                   font=("Arial", 13, "bold"), anchor="w")
-                canvas.create_text(lx+logo_size+10, ly+26,
-                                   text="LAUNCHER", fill="#a78bfa",
-                                   font=("Arial", 9, "bold"), anchor="w")
-                canvas.create_text(lx+logo_size+10, ly+40,
-                                   text="NEOFORGE EDITION", fill="#7c3aed",
-                                   font=("Arial", 7, "bold"), anchor="w")
             except Exception:
                 pass
         hero_canvas.bind("<Configure>", lambda e: _load_hero_bg(hero_canvas))
-        hero.after(50, lambda: _load_hero_bg(hero_canvas))
+        hero.after(60, lambda: _load_hero_bg(hero_canvas))
 
+        # Texte hero
         hero_txt = ctk.CTkFrame(hero, fg_color="transparent")
-        hero_txt.place(x=28, y=90)
+        hero_txt.place(x=24, y=24)
         ctk.CTkLabel(hero_txt, text="Bienvenue dans",
-                     font=ctk.CTkFont(size=14), text_color="#d1c4ff").pack(anchor="w")
+                     font=ctk.CTkFont(size=13), text_color="#c4b5fd").pack(anchor="w")
         ctk.CTkLabel(hero_txt, text="Sakura Launcher",
-                     font=ctk.CTkFont(size=30, weight="bold"),
+                     font=ctk.CTkFont(size=28, weight="bold"),
                      text_color="white").pack(anchor="w")
-        ctk.CTkLabel(hero_txt, text="Le launcher ultime pour NeoForge, optimisé pour la performance.",
-                     font=ctk.CTkFont(size=11), text_color="#a78bfa").pack(anchor="w", pady=(2,10))
+        ctk.CTkLabel(hero_txt,
+                     text="Le launcher ultime pour NeoForge, optimisé pour la performance.",
+                     font=ctk.CTkFont(size=11), text_color="#a78bfa").pack(anchor="w", pady=(2, 10))
         ctk.CTkButton(hero_txt, text="▶  Jouer à Minecraft", height=36, width=175,
                       fg_color=ACCENT, hover_color="#6d28d9",
                       font=ctk.CTkFont(size=13, weight="bold"),
                       command=self._launch_current).pack(anchor="w")
 
-        # Version selector (bas droite du hero)
+        # Version selector (bas gauche du hero)
         ver_sel = ctk.CTkFrame(hero, fg_color="#1a1535", corner_radius=8)
-        ver_sel.place(relx=1, rely=1, x=-16, y=-16, anchor="se")
+        ver_sel.place(relx=0, rely=1, x=24, y=-16, anchor="sw")
         ctk.CTkLabel(ver_sel, text="Version sélectionnée",
-                     font=ctk.CTkFont(size=10), text_color=TEXT3).pack(padx=12, pady=(6,2))
+                     font=ctk.CTkFont(size=10), text_color=TEXT3).pack(padx=12, pady=(6, 2))
         self._hero_ver_combo = ctk.CTkComboBox(ver_sel, variable=self.selected_id,
                                                 values=["Chargement..."], width=180,
                                                 fg_color=CARD, border_color=BORDER,
                                                 button_color=ACCENT,
                                                 font=ctk.CTkFont(size=12))
-        self._hero_ver_combo.pack(padx=10, pady=(0,8))
+        self._hero_ver_combo.pack(padx=10, pady=(0, 8))
 
-        # Quick tools + realtime row
-        row1 = ctk.CTkFrame(scroll, fg_color="transparent")
-        row1.pack(fill="x", padx=20, pady=(0,8))
+        # ── Colonne droite : Outils rapides + Statut temps réel ──────────
+        right_col = ctk.CTkFrame(top_row, fg_color="transparent", width=260)
+        right_col.pack(side="right", fill="y")
+        right_col.pack_propagate(False)
 
-        # Outils rapides
-        tools_card = Card(row1, "OUTILS RAPIDES")
-        tools_card.pack(side="left", fill="both", expand=True, padx=(0,8))
+        tools_card = Card(right_col, "OUTILS RAPIDES")
+        tools_card.pack(fill="x", pady=(0, 6))
         t_row = ctk.CTkFrame(tools_card, fg_color="transparent")
-        t_row.pack(padx=10, pady=(0,12))
+        t_row.pack(padx=8, pady=(0, 10))
         for icon, label, cmd in [
-            ("⚡","Optimisation", lambda: self._show_page("optimisation")),
-            ("🗑","Nettoyer\nle Cache", self._clear_cache),
-            ("⚙","Générateur\nJVM", lambda: self._show_page("optimisation")),
-            ("📁","Ouvrir le\nDossier", self._open_mods),
+            ("⚡", "Optimisation",    lambda: self._show_page("optimisation")),
+            ("🗑", "Nettoyer\nle Cache", self._clear_cache),
+            ("⚙", "Générateur\nJVM",  lambda: self._show_page("optimisation")),
+            ("📁", "Ouvrir le\nDossier", self._open_mods),
         ]:
-            b = ctk.CTkFrame(t_row, fg_color=CARD2, corner_radius=10, width=90, height=72)
-            b.pack(side="left", padx=5)
+            b = ctk.CTkFrame(t_row, fg_color=CARD2, corner_radius=10, width=54, height=60)
+            b.pack(side="left", padx=3)
             b.pack_propagate(False)
-            ctk.CTkLabel(b, text=icon, font=ctk.CTkFont(size=22)).pack(pady=(10,2))
-            ctk.CTkLabel(b, text=label, font=ctk.CTkFont(size=10),
+            ctk.CTkLabel(b, text=icon, font=ctk.CTkFont(size=18)).pack(pady=(8, 1))
+            ctk.CTkLabel(b, text=label, font=ctk.CTkFont(size=9),
                          text_color=TEXT2, justify="center").pack()
             b.bind("<Button-1>", lambda e, c=cmd: c())
             b.bind("<Enter>",    lambda e, w=b: w.configure(fg_color=ACT_BG))
             b.bind("<Leave>",    lambda e, w=b: w.configure(fg_color=CARD2))
 
-        # Statut temps réel
-        rt_card = Card(row1, "STATUT EN TEMPS RÉEL")
-        rt_card.pack(side="right", fill="y", ipadx=6)
-        self._stat_fps  = StatRow(rt_card, "FPS");         self._stat_fps.pack(fill="x", padx=12, pady=2)
+        rt_card = Card(right_col, "STATUT EN TEMPS RÉEL")
+        rt_card.pack(fill="both", expand=True)
+        self._stat_fps  = StatRow(rt_card, "FPS");          self._stat_fps.pack(fill="x", padx=12, pady=2)
         self._stat_ram  = StatRow(rt_card, "RAM Utilisée"); self._stat_ram.pack(fill="x", padx=12, pady=2)
         self._stat_ping = StatRow(rt_card, "Ping", color=GREEN); self._stat_ping.pack(fill="x", padx=12, pady=2)
-        self._stat_tps  = StatRow(rt_card, "TPS (Serveur)"); self._stat_tps.pack(fill="x", padx=12, pady=(2,12))
+        self._stat_tps  = StatRow(rt_card, "TPS (Serveur)"); self._stat_tps.pack(fill="x", padx=12, pady=(2, 12))
 
         # Big row: Optimisation / JVM / Réseau / Mods
         row2 = ctk.CTkFrame(scroll, fg_color="transparent")

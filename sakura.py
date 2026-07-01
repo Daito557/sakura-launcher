@@ -887,12 +887,16 @@ class SakuraLauncher:
     # ── ACCUEIL ───────────────────────────────────────────────────────────────
 
     def _page_accueil(self, f):
-        scroll = ctk.CTkScrollableFrame(f, fg_color=BG, scrollbar_button_color=CARD2)
+        # Frame principal non-scrollable qui remplit tout l'espace
+        scroll = ctk.CTkFrame(f, fg_color=BG, corner_radius=0)
         scroll.pack(fill="both", expand=True)
+        scroll.rowconfigure(0, weight=0)   # annonce
+        scroll.rowconfigure(1, weight=2)   # hero row
+        scroll.rowconfigure(2, weight=2)   # cards row
+        scroll.rowconfigure(3, weight=1)   # bottom row
+        scroll.columnconfigure(0, weight=1)
 
-        # Bannière d'annonce admin (cachée par défaut, affichée par
-        # _update_announcement_ui si un admin diffuse un message via
-        # /announce sur le serveur de présence).
+        # Bannière d'annonce admin
         self._announcement_banner = ctk.CTkLabel(
             scroll, text="", fg_color=ACT_BG, corner_radius=8,
             text_color=TEXT, font=ctk.CTkFont(size=12, weight="bold"),
@@ -901,7 +905,9 @@ class SakuraLauncher:
         # ── Rangée haute : Hero (gauche) + Outils rapides / Statut (droite) ──
         HERO_H = 260
         top_row = ctk.CTkFrame(scroll, fg_color="transparent")
-        top_row.pack(fill="x", padx=20, pady=(16, 8))
+        top_row.grid(row=1, column=0, sticky="nsew", padx=20, pady=(10, 6))
+        top_row.rowconfigure(0, weight=1)
+        top_row.columnconfigure(0, weight=1)
 
         # ── Hero (gauche, image château) ──────────────────────────────────
         hero = ctk.CTkFrame(top_row, fg_color="#0a0814", corner_radius=14,
@@ -1007,10 +1013,13 @@ class SakuraLauncher:
 
         # Big row: Optimisation / JVM / Réseau / Mods — 4 colonnes égales
         row2 = ctk.CTkFrame(scroll, fg_color="transparent")
-        row2.pack(fill="x", padx=20, pady=(0,8))
+        row2.grid(row=2, column=0, sticky="nsew", padx=20, pady=(0,6))
         for i in range(4):
             row2.columnconfigure(i, weight=1, uniform="col")
         row2.rowconfigure(0, weight=1)
+        # Les cartes de row2 s'étendent en hauteur
+        for c in range(4):
+            row2.grid_rowconfigure(0, weight=1)
 
         # Optimisation système
         opt_c = Card(row2, "OPTIMISATION SYSTÈME")
@@ -1114,7 +1123,7 @@ class SakuraLauncher:
 
         # Bottom row: Logs / Options de lancement / Sakura Mode
         row3 = ctk.CTkFrame(scroll, fg_color="transparent")
-        row3.pack(fill="both", expand=True, padx=20, pady=(0,16))
+        row3.grid(row=3, column=0, sticky="nsew", padx=20, pady=(0,10))
         row3.columnconfigure(0, weight=2, uniform="bot")
         row3.columnconfigure(1, weight=1, uniform="bot")
         row3.columnconfigure(2, weight=1, uniform="bot")

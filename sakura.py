@@ -1005,13 +1005,16 @@ class SakuraLauncher:
         self._stat_ping = StatRow(rt_card, "Ping", color=GREEN); self._stat_ping.pack(fill="x", padx=12, pady=2)
         self._stat_tps  = StatRow(rt_card, "TPS (Serveur)"); self._stat_tps.pack(fill="x", padx=12, pady=(2, 12))
 
-        # Big row: Optimisation / JVM / Réseau / Mods
+        # Big row: Optimisation / JVM / Réseau / Mods — 4 colonnes égales
         row2 = ctk.CTkFrame(scroll, fg_color="transparent")
         row2.pack(fill="x", padx=20, pady=(0,8))
+        for i in range(4):
+            row2.columnconfigure(i, weight=1, uniform="col")
+        row2.rowconfigure(0, weight=1)
 
         # Optimisation système
         opt_c = Card(row2, "OPTIMISATION SYSTÈME")
-        opt_c.pack(side="left", fill="both", expand=True, padx=(0,6))
+        opt_c.grid(row=0, column=0, sticky="nsew", padx=(0,4))
         self._opt_rows = {}
         for lbl, val, col in [
             ("Mode Performance","Activé", GREEN),
@@ -1031,7 +1034,7 @@ class SakuraLauncher:
 
         # Générateur JVM
         jvm_c = Card(row2, "GÉNÉRATEUR JVM")
-        jvm_c.pack(side="left", fill="both", expand=True, padx=(0,6))
+        jvm_c.grid(row=0, column=1, sticky="nsew", padx=4)
         ctk.CTkLabel(jvm_c, text="RAM Allouée :", text_color=TEXT2,
                      font=ctk.CTkFont(size=12)).pack(anchor="w", padx=12)
         self._ram_lbl = ctk.CTkLabel(jvm_c, text=f"{self.ram_mb.get()} MB",
@@ -1059,7 +1062,7 @@ class SakuraLauncher:
 
         # Réseau
         net_c = Card(row2, "RÉSEAU")
-        net_c.pack(side="left", fill="both", expand=True, padx=(0,6))
+        net_c.grid(row=0, column=2, sticky="nsew", padx=4)
         ctk.CTkLabel(net_c, text="DNS Actuel", text_color=TEXT2,
                      font=ctk.CTkFont(size=11)).pack(anchor="w", padx=12)
         self._dns_lbl = ctk.CTkLabel(net_c, text="Cloudflare (1.1.1.1)",
@@ -1090,7 +1093,7 @@ class SakuraLauncher:
 
         # Mods NeoForge
         mods_c = Card(row2, "MODS NEOFORGE")
-        mods_c.pack(side="right", fill="both", expand=True)
+        mods_c.grid(row=0, column=3, sticky="nsew", padx=(4,0))
         self._mod_search = ctk.CTkEntry(mods_c, placeholder_text="Rechercher un mod...",
                                          height=28, fg_color=CARD2, border_color=BORDER)
         self._mod_search.pack(fill="x", padx=12, pady=4)
@@ -1112,16 +1115,20 @@ class SakuraLauncher:
         # Bottom row: Logs / Options de lancement / Sakura Mode
         row3 = ctk.CTkFrame(scroll, fg_color="transparent")
         row3.pack(fill="x", padx=20, pady=(0,16))
+        row3.columnconfigure(0, weight=2, uniform="bot")
+        row3.columnconfigure(1, weight=1, uniform="bot")
+        row3.columnconfigure(2, weight=1, uniform="bot")
+        row3.rowconfigure(0, weight=1)
 
         logs_c = Card(row3, "DERNIERS LOGS")
-        logs_c.pack(side="left", fill="both", expand=True, padx=(0,8))
+        logs_c.grid(row=0, column=0, sticky="nsew", padx=(0,4))
         self._accueil_log = ctk.CTkTextbox(logs_c, height=100, fg_color=CARD2,
                                             text_color=CYAN, font=ctk.CTkFont(size=11, family="Courier"),
                                             state="disabled")
         self._accueil_log.pack(fill="x", padx=12, pady=(0,10))
 
         opt_launch = Card(row3, "OPTIONS DE LANCEMENT")
-        opt_launch.pack(side="left", fill="y", padx=(0,8))
+        opt_launch.grid(row=0, column=1, sticky="nsew", padx=4)
         for text, var in [
             ("Lancer après optimisation", self.auto_opt),
             ("Fermer launcher au lancement", self.close_on_launch),
@@ -1135,7 +1142,7 @@ class SakuraLauncher:
 
         # Sakura mode card
         ss_card = Card(row3)
-        ss_card.pack(side="right", fill="y")
+        ss_card.grid(row=0, column=2, sticky="nsew", padx=(4,0))
         ctk.CTkLabel(ss_card, text="⚡", font=ctk.CTkFont(size=30)).pack(pady=(14,2))
         ctk.CTkLabel(ss_card, text="SUPERSONIC MODE",
                      font=ctk.CTkFont(size=12, weight="bold"), text_color=TEXT2).pack()

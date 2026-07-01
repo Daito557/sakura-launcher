@@ -1610,7 +1610,7 @@ class SakuraLauncher:
                               ).pack(side="right", padx=(0, 4))
 
     def _admin_edit_launches(self, target_name):
-        url = self._cfg.get("presence_url", "").strip()
+        url = self.server_url.get().strip()
         if not url:
             messagebox.showwarning("Erreur", "Aucun serveur de présence configuré.")
             return

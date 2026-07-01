@@ -150,6 +150,32 @@ class Handler(BaseHTTPRequestHandler):
                     _save_data()
             self._send_json(200, {"ok": True, "new": is_new})
 
+        elif self.path == "/admin/set_launches":
+            # Modifie le nombre de lancements d'un joueur (admins seulement).
+            # Body : {"username": "admin_name", "target": "player", "launches": 42}
+            data = self._read_json()
+            admin   = str(data.get("username", "")).strip()
+            target  = str(data.get("target",   "")).strip()
+            launches = data.get("launches")
+            if admin not in ADMIN_USERS:
+                self._send_json(403, {"ok": False, "error": "pas admin"})
+                return
+            if not target:
+                self._send_json(400, {"ok": False, "error": "target manquant"})
+                return
+            try:
+                launches = int(launches)
+                if launches < 0:
+                    raise ValueError
+            except (TypeError, ValueError):
+                self._send_json(400, {"ok": False, "error": "launches doit être un entier >= 0"})
+                return
+            with _lock:
+                _launches[target] = launches
+                _all_users.add(target)
+                _save_data()
+            self._send_json(200, {"ok": True, "target": target, "launches": launches})
+
         elif self.path == "/trophy/sync":
             # Remplace l'ensemble des trophées "mc_*" (avancements Minecraft)
             # d'un joueur par la liste fournie, qui reflète son état RÉEL en

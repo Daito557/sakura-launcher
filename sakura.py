@@ -1601,6 +1601,59 @@ class SakuraLauncher:
                          weight="bold" if name == current else "normal")).pack(side="left")
             ctk.CTkLabel(r, text=f"{row.get('launches',0)} lancements · 🏆 {row.get('trophies',0)}",
                          text_color=TEXT3, font=ctk.CTkFont(size=11)).pack(side="right", padx=10)
+            if self._is_admin:
+                _name = name
+                ctk.CTkButton(r, text="✏", width=28, height=22, fg_color=CARD2,
+                              hover_color=ACCENT, text_color=TEXT2,
+                              font=ctk.CTkFont(size=11),
+                              command=lambda n=_name: self._admin_edit_launches(n)
+                              ).pack(side="right", padx=(0, 4))
+
+    def _admin_edit_launches(self, target_name):
+        url = self._cfg.get("presence_url", "").strip()
+        if not url:
+            messagebox.showwarning("Erreur", "Aucun serveur de présence configuré.")
+            return
+        val = simpledialog.askstring(
+            "✏ Modifier les lancements",
+            f"Nouveau nombre de lancements pour {target_name} :",
+            parent=self.root
+        )
+        if val is None:
+            return
+        try:
+            new_count = int(val)
+            if new_count < 0:
+                raise ValueError
+        except ValueError:
+            messagebox.showerror("Erreur", "Entier >= 0 requis.")
+            return
+        def send():
+            try:
+                body = json.dumps({
+                    "username": self.username.get().strip(),
+                    "target":   target_name,
+                    "launches": new_count,
+                }).encode("utf-8")
+                req = urllib.request.Request(
+                    url.rstrip("/") + "/admin/set_launches",
+                    data=body,
+                    method="POST",
+                    headers={"Content-Type": "application/json"},
+                )
+                with urllib.request.urlopen(req, timeout=5) as r:
+                    resp = json.loads(r.read())
+                if resp.get("ok"):
+                    self.root.after(0, lambda: messagebox.showinfo(
+                        "✅ Succès",
+                        f"{target_name} : {new_count} lancement(s) enregistré(s)."))
+                    self.root.after(0, self._refresh_leaderboard)
+                else:
+                    msg = resp.get("error", "Erreur inconnue")
+                    self.root.after(0, lambda: messagebox.showerror("Refusé", msg))
+            except Exception as e:
+                self.root.after(0, lambda: messagebox.showerror("Erreur réseau", str(e)))
+        threading.Thread(target=send, daemon=True).start()
 
     # ── OPTIMISATION ──────────────────────────────────────────────────────────
 

@@ -926,7 +926,10 @@ class SakuraLauncher:
                 if not bg_path.exists():
                     return
                 canvas.update_idletasks()
-                w = canvas.winfo_width() or 700
+                w = canvas.winfo_width()
+                h = canvas.winfo_height() or h
+                if w < 10:
+                    return
                 img = Image.open(bg_path)
                 ratio = w / img.width
                 img = img.resize((w, max(h, int(img.height * ratio))), Image.LANCZOS)
@@ -946,8 +949,11 @@ class SakuraLauncher:
                 canvas.create_image(0, 0, anchor="nw", image=photo)
             except Exception:
                 pass
-        hero_canvas.bind("<Configure>", lambda e: _load_hero_bg(hero_canvas))
-        hero.after(60, lambda: _load_hero_bg(hero_canvas))
+        def _on_hero_resize(e):
+            _load_hero_bg(hero_canvas, e.height or HERO_H)
+        hero_canvas.bind("<Configure>", _on_hero_resize)
+        hero.after(100, lambda: _load_hero_bg(hero_canvas, hero.winfo_height() or HERO_H))
+        hero.after(500, lambda: _load_hero_bg(hero_canvas, hero.winfo_height() or HERO_H))
 
         # Texte hero
         hero_txt = ctk.CTkFrame(hero, fg_color="transparent")

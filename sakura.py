@@ -898,44 +898,89 @@ class SakuraLauncher:
             text_color=TEXT, font=ctk.CTkFont(size=12, weight="bold"),
             anchor="w", height=36)
 
-        # Hero
+        # Hero — image de fond château
+        HERO_H = 220
         hero = ctk.CTkFrame(scroll, fg_color="#0a0814", corner_radius=14,
-                             border_width=1, border_color=BORDER, height=190)
+                             border_width=1, border_color=BORDER, height=HERO_H)
         hero.pack(fill="x", padx=20, pady=(16,10))
         hero.pack_propagate(False)
         self._accueil_hero = hero
 
-        # Stars decoration on hero
-        stars = ctk.CTkCanvas(hero, bg="#0a0814", highlightthickness=0, height=190)
-        stars.place(relx=0, rely=0, relwidth=1, relheight=1)
-        import random; random.seed(42)
-        for _ in range(80):
-            x = random.randint(0,1000); y = random.randint(0,190)
-            r = random.choice([1,1,1,2])
-            stars.create_oval(x,y,x+r,y+r, fill="#c8b8ff", outline="")
-        # Castle silhouettes
-        for cx, h in [(180,60),(210,80),(240,65),(300,55),(330,75),(350,58),(410,62),(440,80)]:
-            stars.create_rectangle(cx, 190-h, cx+10, 190, fill="#110f2a", outline="")
-            stars.create_rectangle(cx-2, 190-h-6, cx+12, 190-h, fill="#14122e", outline="")
-        # Fog
-        stars.create_rectangle(0,160,1000,190, fill="#0c0a1e", outline="", stipple="gray50")
+        # Canvas pour l'image de fond
+        hero_canvas = tk.Canvas(hero, highlightthickness=0, bd=0, bg="#0a0814")
+        hero_canvas.place(relx=0, rely=0, relwidth=1, relheight=1)
+
+        def _load_hero_bg(canvas, h=HERO_H):
+            try:
+                from PIL import Image, ImageTk, ImageEnhance, ImageFilter
+                bg_path = resource_path("background.jpg")
+                if not bg_path.exists():
+                    bg_path = BASE_DIR / "background.jpg"
+                if not bg_path.exists():
+                    return
+                img = Image.open(bg_path)
+                # Resize pour remplir la largeur tout en gardant les proportions
+                canvas.update_idletasks()
+                w = canvas.winfo_width() or 900
+                ratio = w / img.width
+                img = img.resize((w, max(h, int(img.height * ratio))), Image.LANCZOS)
+                # Recadre centré sur la hauteur voulue
+                if img.height > h:
+                    top = (img.height - h) // 2
+                    img = img.crop((0, top, w, top + h))
+                # Assombrir légèrement pour lisibilité du texte
+                img = ImageEnhance.Brightness(img).enhance(0.55)
+                # Dégradé sombre sur la gauche (pour le texte)
+                from PIL import ImageDraw
+                overlay = Image.new("RGBA", img.size, (0,0,0,0))
+                draw = ImageDraw.Draw(overlay)
+                for i in range(min(420, w)):
+                    alpha = int(180 * (1 - i / 420))
+                    draw.line([(i, 0), (i, h)], fill=(10, 8, 20, alpha))
+                img = img.convert("RGBA")
+                img = Image.alpha_composite(img, overlay).convert("RGB")
+                photo = ImageTk.PhotoImage(img)
+                canvas._bg_photo = photo  # garder la référence
+                canvas.create_image(0, 0, anchor="nw", image=photo)
+                # Logo Sakura (carré violet) en haut à gauche
+                logo_size = 44
+                lx, ly = 28, 24
+                canvas.create_rectangle(lx, ly, lx+logo_size, ly+logo_size,
+                                        fill="#7c3aed", outline="#a78bfa", width=2)
+                canvas.create_text(lx+logo_size//2, ly+logo_size//2,
+                                   text="S", fill="white",
+                                   font=("Arial", 22, "bold"))
+                # Texte "SAKURA LAUNCHER"
+                canvas.create_text(lx+logo_size+10, ly+8,
+                                   text="SAKURA", fill="white",
+                                   font=("Arial", 13, "bold"), anchor="w")
+                canvas.create_text(lx+logo_size+10, ly+26,
+                                   text="LAUNCHER", fill="#a78bfa",
+                                   font=("Arial", 9, "bold"), anchor="w")
+                canvas.create_text(lx+logo_size+10, ly+40,
+                                   text="NEOFORGE EDITION", fill="#7c3aed",
+                                   font=("Arial", 7, "bold"), anchor="w")
+            except Exception:
+                pass
+        hero_canvas.bind("<Configure>", lambda e: _load_hero_bg(hero_canvas))
+        hero.after(50, lambda: _load_hero_bg(hero_canvas))
 
         hero_txt = ctk.CTkFrame(hero, fg_color="transparent")
-        hero_txt.place(x=28, y=28)
+        hero_txt.place(x=28, y=90)
         ctk.CTkLabel(hero_txt, text="Bienvenue dans",
-                     font=ctk.CTkFont(size=15), text_color=TEXT2).pack(anchor="w")
+                     font=ctk.CTkFont(size=14), text_color="#d1c4ff").pack(anchor="w")
         ctk.CTkLabel(hero_txt, text="Sakura Launcher",
-                     font=ctk.CTkFont(size=32, weight="bold"),
-                     text_color=TEXT).pack(anchor="w")
-        ctk.CTkLabel(hero_txt, text="Sakura — Le launcher ultime pour NeoForge, Fabric, Quilt et Forge.",
-                     font=ctk.CTkFont(size=12), text_color=TEXT3).pack(anchor="w", pady=(2,10))
-        ctk.CTkButton(hero_txt, text="▶  Jouer à Minecraft", height=38, width=180,
+                     font=ctk.CTkFont(size=30, weight="bold"),
+                     text_color="white").pack(anchor="w")
+        ctk.CTkLabel(hero_txt, text="Le launcher ultime pour NeoForge, optimisé pour la performance.",
+                     font=ctk.CTkFont(size=11), text_color="#a78bfa").pack(anchor="w", pady=(2,10))
+        ctk.CTkButton(hero_txt, text="▶  Jouer à Minecraft", height=36, width=175,
                       fg_color=ACCENT, hover_color="#6d28d9",
                       font=ctk.CTkFont(size=13, weight="bold"),
                       command=self._launch_current).pack(anchor="w")
 
-        # Version selector (top-right of hero)
-        ver_sel = ctk.CTkFrame(hero, fg_color=CARD2, corner_radius=8)
+        # Version selector (bas droite du hero)
+        ver_sel = ctk.CTkFrame(hero, fg_color="#1a1535cc", corner_radius=8)
         ver_sel.place(relx=1, rely=1, x=-16, y=-16, anchor="se")
         ctk.CTkLabel(ver_sel, text="Version sélectionnée",
                      font=ctk.CTkFont(size=10), text_color=TEXT3).pack(padx=12, pady=(6,2))

@@ -17,3 +17,4 @@ output/
 
 # Données locales du serveur de présence (lancements/trophées, pas du code)
 server_data.json
+*.zip

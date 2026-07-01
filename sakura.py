@@ -1114,7 +1114,7 @@ class SakuraLauncher:
 
         # Bottom row: Logs / Options de lancement / Sakura Mode
         row3 = ctk.CTkFrame(scroll, fg_color="transparent")
-        row3.pack(fill="x", padx=20, pady=(0,16))
+        row3.pack(fill="both", expand=True, padx=20, pady=(0,16))
         row3.columnconfigure(0, weight=2, uniform="bot")
         row3.columnconfigure(1, weight=1, uniform="bot")
         row3.columnconfigure(2, weight=1, uniform="bot")
@@ -1122,10 +1122,10 @@ class SakuraLauncher:
 
         logs_c = Card(row3, "DERNIERS LOGS")
         logs_c.grid(row=0, column=0, sticky="nsew", padx=(0,4))
-        self._accueil_log = ctk.CTkTextbox(logs_c, height=100, fg_color=CARD2,
+        self._accueil_log = ctk.CTkTextbox(logs_c, fg_color=CARD2,
                                             text_color=CYAN, font=ctk.CTkFont(size=11, family="Courier"),
                                             state="disabled")
-        self._accueil_log.pack(fill="x", padx=12, pady=(0,10))
+        self._accueil_log.pack(fill="both", expand=True, padx=12, pady=(0,10))
 
         opt_launch = Card(row3, "OPTIONS DE LANCEMENT")
         opt_launch.grid(row=0, column=1, sticky="nsew", padx=4)

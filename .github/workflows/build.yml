@@ -30,15 +30,15 @@ jobs:
       # ── Build launcher principal ──────────────────────────────────────────
       - name: Build Windows (normal)
         if: matrix.name == 'windows'
-        run: pyinstaller --noconfirm --onefile --windowed --noupx --name SakuraLauncher --icon icon.ico --add-data "icon.png;." --distpath dist sakura.py
+        run: pyinstaller --noconfirm --onefile --windowed --noupx --name SakuraLauncher --icon icon.ico --add-data "icon.png;." --add-data "background.jpg;." --distpath dist sakura.py
 
       - name: Build macOS (normal)
         if: matrix.name == 'macos'
-        run: pyinstaller --noconfirm --windowed --name SakuraLauncher --icon icon.icns --add-data "icon.png:." --distpath dist sakura.py
+        run: pyinstaller --noconfirm --windowed --name SakuraLauncher --icon icon.icns --add-data "icon.png:." --add-data "background.jpg:." --distpath dist sakura.py
 
       - name: Build Linux (normal)
         if: matrix.name == 'linux'
-        run: pyinstaller --noconfirm --onedir --name SakuraLauncher --icon icon.png --add-data "icon.png:." --distpath dist sakura.py
+        run: pyinstaller --noconfirm --onedir --name SakuraLauncher --icon icon.png --add-data "icon.png:." --add-data "background.jpg:." --distpath dist sakura.py
 
       # ── Build version Low PC ──────────────────────────────────────────────
       - name: Build Windows (LowPC)

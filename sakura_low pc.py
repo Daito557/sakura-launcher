@@ -67,6 +67,247 @@ def record_launch(username):
 
 DISCORD_SUPPORT_URL = "https://discord.gg/zqw8KGKWJ"
 
+# ── Cache d'avatars Minecraft (têtes de joueurs) pour le classement ──────────
+_AVATAR_CACHE = {}
+
+# ── Trophées ─────────────────────────────────────────────────────────────────
+TROPHIES = {
+    "first_launch":      ("🎮", "Premier pas",       "Lancer Minecraft pour la première fois"),
+    "launches_10":       ("🔥", "Habitué",            "10 lancements depuis ce launcher"),
+    "launches_50":       ("⭐", "Vétéran",            "50 lancements depuis ce launcher"),
+    "launches_200":      ("👑", "Légende",            "200 lancements depuis ce launcher"),
+    "skin_custom":       ("🎨", "Stylé",              "Appliquer un skin personnalisé"),
+    "mod_dropper":       ("🧩", "Bricoleur",          "Installer un mod via la page Mods"),
+    "shader_installed":  ("✨", "Esthète",            "Installer un shaderpack"),
+    "admin":             ("🛡", "Modérateur",         "Devenir admin du serveur de présence"),
+}
+
+TROPHIES_FILE = BASE_DIR / "trophies.json"
+
+def load_trophies():
+    try:
+        if TROPHIES_FILE.exists():
+            return json.loads(TROPHIES_FILE.read_text("utf-8"))
+    except Exception:
+        pass
+    return {}
+
+def save_trophies(d):
+    try:
+        TROPHIES_FILE.write_text(json.dumps(d, indent=2, ensure_ascii=False), "utf-8")
+    except Exception:
+        pass
+
+def offline_uuid(username):
+    import hashlib as _hl
+    raw = _hl.md5(("OfflinePlayer:" + username).encode()).digest()
+    b = bytearray(raw)
+    b[6] = (b[6] & 0x0f) | 0x30
+    b[8] = (b[8] & 0x3f) | 0x80
+    return "{:08x}-{:04x}-{:04x}-{:04x}-{:012x}".format(
+        int.from_bytes(b[0:4], 'big'), int.from_bytes(b[4:6], 'big'),
+        int.from_bytes(b[6:8], 'big'), int.from_bytes(b[8:10], 'big'),
+        int.from_bytes(b[10:16], 'big'))
+
+MC_ADVANCEMENTS = {
+    # ── Histoire ──────────────────────────────────────────────────────────────
+    "story/root":              ("🪵", "Âge de pierre",          "Ramasser du bois"),
+    "story/mine_stone":        ("⛏", "Pierre angulaire",        "Miner de la pierre avec une pioche en bois"),
+    "story/smelt_iron":        ("🔧", "Acquisition de fer",      "Fondre un lingot de fer"),
+    "story/iron_tools":        ("⛏", "C'est un pic en fer !",   "Fabriquer une pioche en fer"),
+    "story/obtain_armor":      ("🪖", "Habillé pour l'occasion", "Porter une pièce d'armure en fer"),
+    "story/lava_bucket":       ("🪣", "Hot Stuff",               "Remplir un seau de lave"),
+    "story/deflect_arrow":     ("🏹", "Pas aujourd'hui",         "Dévier une flèche avec un bouclier"),
+    "story/form_obsidian":     ("🔵", "Seau de glace",           "Obtenir de l'obsidienne"),
+    "story/mine_diamond":      ("💎", "Diamants !",              "Obtenir un diamant"),
+    "story/shiny_gear":        ("💎", "Couvrez-moi de diamants", "Porter une armure en diamant"),
+    "story/upgrade_tools":     ("⬆", "Diamants pour vous !",    "Obtenir un diamant et faire un outil en diamant"),
+    "story/enchant_item":      ("✨", "Enchanteur",              "Enchanter un objet"),
+    "story/cure_zombie_villager": ("🧟", "Docteur Zombie",       "Soigner un villageois zombie"),
+    "story/enter_the_nether":  ("🔥", "Nous devons creuser",     "Entrer dans le Nether"),
+    "story/follow_ender_eye":  ("👁", "Espion",                  "Suivre un œil de l'Ender"),
+    "story/enter_the_end":     ("🌌", "La fin ?",                "Entrer dans l'End"),
+    # ── Nether ────────────────────────────────────────────────────────────────
+    "nether/root":             ("🔥", "Dans le Nether",          "Entrer dans le Nether"),
+    "nether/find_fortress":    ("🏰", "Une terrible fortresse",  "Trouver une forteresse du Nether"),
+    "nether/obtain_blaze_rod": ("🔮", "Bâton de Blaze",          "Obtenir un bâton de Blaze"),
+    "nether/brew_potion":      ("🧪", "Première potion",         "Brasser une potion"),
+    "nether/uneasy_alliance":  ("🐷", "Alliance risquée",        "Ramener un Ghast dans l'Overworld"),
+    "nether/get_wither_skull": ("💀", "Crâne de Wither",         "Obtenir un crâne de Wither"),
+    "nether/summon_wither":    ("💥", "Nether... Vaincre !",     "Invoquer le Wither"),
+    "nether/create_beacon":    ("🏛", "Beacon créé",             "Construire et activer un beacon"),
+    "nether/create_full_beacon":("👑","Beacon pleine puissance", "Activer un beacon au niveau 4"),
+    "nether/ride_strider":     ("🦎", "Chevaucher le Strider",   "Monter un Strider en lave"),
+    "nether/ride_strider_in_overworld_lava": ("🌋", "Strider en overworld", "Monter un Strider dans la lave de l'Overworld"),
+    "nether/explore_nether":   ("🗺", "Explorer le Nether",      "Visiter tous les biomes du Nether"),
+    "nether/fast_travel":      ("⚡", "Voyage éclair",           "Voyager 7km en Overworld via le Nether"),
+    "nether/find_bastion":     ("🏯", "Bastion trouvé",          "Trouver un bastion"),
+    "nether/loot_bastion":     ("💰", "Piller le Bastion",       "Fouiller un coffre dans un bastion"),
+    "nether/obtain_ancient_debris": ("⛏", "Débris anciens",     "Obtenir des débris anciens"),
+    "nether/obtain_crying_obsidian": ("🗿", "Obsidienne pleurante", "Obtenir de l'obsidienne pleurante"),
+    "nether/use_lodestone":    ("⚓", "Lodestone",               "Utiliser une boussole sur un lodestone"),
+    "nether/netherite_armor":  ("🛡", "Armure Netherite",        "Porter une armure complète en Netherite"),
+    "nether/all_potions":      ("💊", "Toutes les potions",      "Avoir l'effet de toutes les potions"),
+    "nether/all_effects":      ("🌀", "Tous les effets",         "Avoir tous les effets de statut"),
+    "nether/distract_piglin":  ("🐗", "Distraire un Piglin",     "Faire du troc avec un Piglin"),
+    "nether/return_to_sender": ("🔄", "Retour à l'envoyeur",     "Détruire un Ghast avec une boule de feu"),
+    "nether/charge_respawn_anchor": ("⚡", "Anchor chargée",     "Charger un point de réapparition"),
+    "nether/obtain_crying_obsidian": ("🔮", "Obsidienne pleurante", "Obtenir de l'obsidienne pleurante"),
+    # ── The End ───────────────────────────────────────────────────────────────
+    "end/root":                ("🌌", "Dans l'End",              "Entrer dans l'End"),
+    "end/kill_dragon":         ("🐉", "Libérer la fin",          "Tuer le dragon de l'End"),
+    "end/dragon_egg":          ("🥚", "Oeuf du Dragon",          "Obtenir l'oeuf du Dragon"),
+    "end/dragon_breath":       ("💨", "Souffle du Dragon",       "Collecter le souffle du Dragon"),
+    "end/enter_end_gateway":   ("🌀", "Gateway de l'End",        "Sauter dans un portail End Gateway"),
+    "end/find_end_city":       ("🏙", "Cité de l'End",           "Trouver une cité de l'End"),
+    "end/elytra":              ("🪂", "Elytra",                  "Trouver des Elytra"),
+    "end/levitate":            ("🎈", "Lévitation",              "Atteindre 50 blocs de hauteur avec un effet Shulker"),
+    "end/respawn_dragon":      ("🐉", "Dragon réinvoqué",        "Réinvoquer le dragon de l'End"),
+    # ── Aventure ──────────────────────────────────────────────────────────────
+    "adventure/root":          ("🗺", "Aventure",                "Trouver quelque chose de nouveau"),
+    "adventure/kill_a_mob":    ("⚔", "Monstre Hunter",           "Tuer une créature hostile"),
+    "adventure/kill_all_mobs": ("🗡", "Monster Hunter Avancé",   "Tuer toutes les créatures"),
+    "adventure/shoot_arrow":   ("🏹", "Tir à l'arc",             "Tirer une flèche"),
+    "adventure/bullseye":      ("🎯", "Dans le mille",           "Tirer une flèche dans le centre d'une cible"),
+    "adventure/sniper_duel":   ("🎯", "Duel de snipers",         "Tuer un squelette à 50 blocs"),
+    "adventure/sleep_in_bed":  ("🛏", "Bonne nuit",              "Dormir dans un lit"),
+    "adventure/hero_of_the_village": ("🏰", "Héros du village",  "Sauver un village d'un raid"),
+    "adventure/voluntary_exile": ("🚪", "Exil volontaire",       "Tuer un capitaine de pillards"),
+    "adventure/summon_iron_golem": ("🤖", "Golem de fer",        "Construire un golem de fer"),
+    "adventure/adventuring_time": ("🗺", "Temps d'aventure",     "Visiter tous les biomes"),
+    "adventure/trade":         ("💰", "Commerce",                "Faire du commerce avec un villageois"),
+    "adventure/very_very_frightening": ("⚡", "Très effrayant",  "Frapper un villageois avec la foudre"),
+    "adventure/honey_block_slide": ("🍯", "Glissade de miel",    "Glisser sur un bloc de miel"),
+    "adventure/walk_on_powder_snow_with_leather_boots": ("🌨", "Marche sur neige poudreuse", "Marcher sur de la neige poudreuse avec des bottes en cuir"),
+    "adventure/play_jukebox_in_meadows": ("🎶", "Jukebox dans la prairie", "Jouer de la musique dans une prairie"),
+    "adventure/arbalistic":    ("🎯", "Balistique",              "Tuer 5 créatures uniques avec une arbalète"),
+    "adventure/two_birds_one_arrow": ("🏹", "2 oiseaux 1 flèche","Tuer 2 Phantoms avec 1 flèche"),
+    "adventure/overoverkill":  ("💀", "Overkill",               "Infliger 50 dégâts en un coup"),
+    "adventure/avoid_vibration": ("🌀", "Sans vibrations",       "Passer près d'un Sculk Sensor sans le déclencher"),
+    "adventure/lighten_up":    ("💡", "Éclairé",                 "Soigner un Strider avec un champignon tordu"),
+    "adventure/kill_mob_near_sculk_catalyst": ("🗿", "Catalyseur Sculk","Tuer une créature près d'un Sculk Catalyst"),
+    "adventure/throw_trident": ("🔱", "Triton lancé",            "Lancer un triton"),
+    "adventure/totem_of_undying": ("🌿", "Totem de survie",      "Utiliser un totem d'immortalité"),
+    "adventure/trim_with_any_armor_pattern": ("🪖", "Armure décorée","Décorer une armure"),
+    "adventure/trim_with_all_exclusive_armor_patterns": ("✨", "Tous les motifs","Décorer avec tous les motifs exclusifs"),
+    "adventure/craft_decorated_pot_using_only_sherds": ("🏺", "Pot de tessons","Fabriquer un pot décoré avec 4 tessons"),
+    "adventure/salvage_sherd": ("🗿", "Tesson sauvé",            "Obtenir un tesson avec une brosse"),
+    "adventure/read_power_of_chiseled_bookshelf": ("📖", "Pouvoir de la bibliothèque ciselée","Lire un livre dans une bibliothèque ciselée"),
+    "adventure/under_lock_and_key": ("🔑", "Sous clé",           "Ouvrir un coffre protégé avec une clé de coffre à essais"),
+    "adventure/revaulting":    ("🔄", "Revaulting",              "Utiliser une clé de coffre à essais sur un coffre déjà ouvert"),
+    "adventure/minecraft_trials_edition": ("🎮", "Trials Edition","Obtenir le trophée de la chambre d'essais"),
+    "adventure/crafters_crafting_crafters": ("⚙", "Crafters en série","Avoir une chaîne de crafters"),
+    "adventure/who_needs_rockets": ("🦅", "Qui a besoin de fusées","Utiliser une arbalète pour voler avec Elytra"),
+    "adventure/trade_at_world_height": ("🏡", "Commerce en altitude","Trader à y=320"),
+    "adventure/fall_from_world_height": ("📉", "Chute du ciel",  "Tomber depuis y=320"),
+    "adventure/ol_betsy":      ("🔫", "Old Betsy",              "Charger une arbalète"),
+    "adventure/blowback":      ("💨", "Blowback",               "Tuer une créature avec un feu d'artifice tiré par une arbalète"),
+    "adventure/brush_armadillo": ("🦔", "Brosser une armadille", "Brosser une armadille"),
+    "adventure/lightning_rod_with_villager_no_fire": ("⚡", "Paratonnerre",  "Utiliser un paratonnerre pour protéger un villageois"),
+    "adventure/spyglass_at_dragon": ("🔭", "Longue-vue dragon",  "Observer le dragon avec une longue-vue"),
+    "adventure/spyglass_at_ghast": ("🔭", "Longue-vue Ghast",   "Observer un Ghast avec une longue-vue"),
+    "adventure/spyglass_at_parrot": ("🔭", "Longue-vue perroquet","Observer un perroquet avec une longue-vue"),
+    "adventure/whos_the_pillager_now": ("🪓", "Désarmer le Pillard","Obtenir une arbalète d'un Pillard"),
+    "adventure/fall_from_world_height": ("📉", "Chute extrême",   "Tomber depuis le sommet du monde"),
+    # ── Agriculture ───────────────────────────────────────────────────────────
+    "husbandry/root":          ("🌱", "Agriculture",             "Planter une graine"),
+    "husbandry/plant_seed":    ("🌱", "Planter une graine",      "Planter une graine et la voir pousser"),
+    "husbandry/breed_an_animal": ("🐄", "Élever un animal",      "Élever deux animaux"),
+    "husbandry/tame_an_animal": ("🐕", "Apprivoiser",            "Apprivoiser un animal"),
+    "husbandry/fishy_business": ("🎣", "Affaire de poisson",     "Attraper un poisson"),
+    "husbandry/tactical_fishing": ("🐟", "Pêche tactique",       "Attraper un poisson dans un seau"),
+    "husbandry/axolotl_in_a_bucket": ("🪸", "Axolotl en seau",  "Capturer un axolotl dans un seau"),
+    "husbandry/tadpole_in_a_bucket": ("🐸", "Têtard en seau",   "Capturer un têtard dans un seau"),
+    "husbandry/safely_harvest_honey": ("🍯", "Récolte de miel",  "Récolter du miel sans se faire piquer"),
+    "husbandry/silk_touch_nest": ("🐝", "Nid en soie",           "Déplacer une ruche avec Toucher de soie"),
+    "husbandry/make_a_sign_glow": ("🪵", "Panneau lumineux",     "Faire briller un panneau"),
+    "husbandry/balanced_diet": ("🍗", "Régime équilibré",        "Manger tous les aliments du jeu"),
+    "husbandry/complete_catalogue": ("🐈", "Catalogue complet",  "Apprivoiser tous les chats"),
+    "husbandry/breed_all_animals": ("🐄", "Tous les animaux",    "Élever une paire de chaque animal"),
+    "husbandry/bred_all_animals": ("🐄", "Elevage complet",      "Élever une paire de chaque animal élevable"),
+    "husbandry/wax_on":        ("🐝", "Cire appliquée",          "Appliquer de la cire sur du cuivre"),
+    "husbandry/wax_off":       ("🧽", "Cire retirée",            "Retirer la cire du cuivre"),
+    "husbandry/allay_deliver_item_to_player": ("🎵", "Allay livre un objet","Recevoir un objet d'un Allay"),
+    "husbandry/allay_deliver_cake_to_note_block": ("🎂", "Allay livre un gâteau","Allay dépose un gâteau sur un Bloc Note"),
+    "husbandry/ride_a_boat_with_a_goat": ("🐐", "Bateau + chèvre","Embarquer une chèvre dans un bateau"),
+    "husbandry/whole_pack":    ("🐾", "Meute complète",          "Apprivoiser tous les types de loups"),
+    "husbandry/leash_all_frog_variants": ("🐸", "Toutes les grenouilles","Avoir les 3 variantes de grenouilles"),
+    "husbandry/froglights":    ("💡", "Froglights",              "Obtenir les 3 types de Froglights"),
+    "husbandry/kill_axolotl_target": ("🪸", "Chasse à l'axolotl","Tuer une créature aquatique avec un axolotl"),
+    "husbandry/obtain_sniffer_egg": ("🦕", "Oeuf de Sniffer",   "Obtenir un oeuf de Sniffer"),
+    "husbandry/plant_any_sniffer_seed": ("🌺", "Planter une graine Sniffer","Planter une graine trouvée par un Sniffer"),
+    "husbandry/feed_snifflet": ("🦕", "Nourrir Snifflet",        "Nourrir un bébé Sniffer"),
+    "husbandry/obtain_netherite_hoe": ("⛏", "Houe en Netherite","Obtenir une houe en Netherite"),
+    "husbandry/repair_wolf_armor": ("🐺", "Réparer armure loup", "Réparer l'armure d'un loup"),
+    "husbandry/remove_wolf_armor": ("🐺", "Retirer armure loup", "Retirer l'armure d'un loup"),
+}
+
+MOD_ADVANCEMENTS = {
+    # ── Farmer's Delight ──────────────────────────────────────────────────────
+    "farmersdelight/root":              ("🍽", "[FD] Délices fermiers",        "Découvrir Farmer's Delight"),
+    "farmersdelight/craft_knife":       ("🔪", "[FD] Premier couteau",         "Fabriquer un couteau"),
+    "farmersdelight/obtain_netherite_knife": ("🔪", "[FD] Couteau Netherite",  "Obtenir un couteau en Netherite"),
+    "farmersdelight/eat_nourishing_food": ("🍲", "[FD] Bien nourri",           "Manger un plat nourrissant"),
+    "farmersdelight/get_fd_seed":       ("🌿", "[FD] Graine spéciale",         "Obtenir une graine Farmer's Delight"),
+    "farmersdelight/get_ham":           ("🥩", "[FD] Jambon",                  "Obtenir du jambon"),
+    "farmersdelight/get_mushroom_colony": ("🍄", "[FD] Colonie de champignons","Obtenir une colonie de champignons"),
+    "farmersdelight/get_rich_soil":     ("🌱", "[FD] Terre riche",             "Obtenir de la terre riche"),
+    "farmersdelight/harvest_ropelogged_tomato": ("🍅", "[FD] Récolte tomates", "Récolter des tomates sur corde"),
+    "farmersdelight/harvest_straw":     ("🌾", "[FD] Récolte de paille",       "Récolter de la paille"),
+    "farmersdelight/hit_raider_with_rotten_tomato": ("🍅", "[FD] Tomate pourrie","Frapper un pillard avec une tomate pourrie"),
+    "farmersdelight/master_chef":       ("👨‍🍳", "[FD] Maître chef",           "Cuisiner tous les plats Farmer's Delight"),
+    "farmersdelight/place_campfire":    ("🔥", "[FD] Feu de camp",             "Placer un feu de camp pour cuisiner"),
+    "farmersdelight/place_cooking_pot": ("🍲", "[FD] Marmite",                 "Placer une marmite"),
+    "farmersdelight/place_feast":       ("🎉", "[FD] Festin",                  "Préparer un festin"),
+    "farmersdelight/place_organic_compost": ("♻", "[FD] Compost organique",    "Placer un compost organique"),
+    "farmersdelight/place_skillet":     ("🍳", "[FD] Poêle",                   "Placer une poêle"),
+    "farmersdelight/plant_all_crops":   ("🌽", "[FD] Toutes les cultures",     "Planter toutes les cultures Farmer's Delight"),
+    "farmersdelight/plant_rice":        ("🌾", "[FD] Rizière",                 "Planter du riz"),
+    "farmersdelight/use_cutting_board": ("🪵", "[FD] Planche à découper",      "Utiliser une planche à découper"),
+    "farmersdelight/use_skillet":       ("🍳", "[FD] Cuisson à la poêle",      "Cuisiner avec une poêle"),
+    # ── More Delight ──────────────────────────────────────────────────────────
+    "moredelight/root":                 ("🍴", "[MD] More Delight",            "Découvrir More Delight"),
+    "moredelight/stone_knife":          ("🔪", "[MD] Couteau en pierre",        "Fabriquer un couteau en pierre"),
+    "moredelight/wooden_knife":         ("🔪", "[MD] Couteau en bois",          "Fabriquer un couteau en bois"),
+    "moredelight/get_chicken_sandwich_with_egg_and_tomato": ("🥪", "[MD] Sandwich poulet", "Préparer un sandwich poulet-oeuf-tomate"),
+    "moredelight/get_cooked_rice_with": ("🍚", "[MD] Riz cuisiné",             "Préparer du riz cuisiné"),
+    "moredelight/get_creamy_pasta_with_ham": ("🍝", "[MD] Pasta jambon",       "Préparer des pâtes crémeuses au jambon"),
+    "moredelight/get_diced_potatoes_with": ("🥔", "[MD] Pommes de terre",      "Préparer des pommes de terre coupées"),
+    "moredelight/get_egg_with_bacon_sandwich": ("🥚", "[MD] Sandwich oeuf-bacon","Préparer un sandwich oeuf-bacon"),
+    "moredelight/get_mashed_potatoes":  ("🥔", "[MD] Purée",                   "Préparer de la purée de pommes de terre"),
+    "moredelight/get_omelette":         ("🍳", "[MD] Omelette",                "Préparer une omelette"),
+    "moredelight/get_toast_with_egg":   ("🍞", "[MD] Toast à l'oeuf",          "Préparer un toast à l'oeuf"),
+    # ── Immersive Vehicles (MTS) ──────────────────────────────────────────────
+    "mts/root":                         ("🚗", "[MTS] Véhicules",              "Découvrir Immersive Vehicles"),
+    "mts/wrench":                       ("🔧", "[MTS] Clé à molette",          "Obtenir une clé à molette"),
+    "mts/key":                          ("🔑", "[MTS] Clé de véhicule",        "Obtenir une clé de véhicule"),
+    "mts/fuelpump":                     ("⛽", "[MTS] Pompe à carburant",      "Placer une pompe à carburant"),
+    "mts/fuelhose":                     ("🪣", "[MTS] Tuyau de carburant",     "Utiliser un tuyau de carburant"),
+    "mts/jerrycan":                     ("⛽", "[MTS] Jerrican",               "Utiliser un jerrican"),
+    "mts/paintgun":                     ("🎨", "[MTS] Pistolet de peinture",   "Peindre un véhicule"),
+    "mts/partscanner":                  ("📡", "[MTS] Scanner de pièces",      "Scanner un véhicule"),
+    "mts/jumpercable":                  ("🔋", "[MTS] Câble de démarrage",     "Utiliser un câble de démarrage"),
+    "mts/jumperpack":                   ("🎒", "[MTS] Pack de démarrage",      "Utiliser un pack de démarrage"),
+    "mts/ticket":                       ("🎫", "[MTS] Ticket",                 "Obtenir un ticket de bus"),
+    "mts/itembench":                    ("🪑", "[MTS] Banc à objets",          "Placer un banc à objets MTS"),
+    "mts/vehiclebench":                 ("🚗", "[MTS] Banc de véhicule",       "Placer un banc de véhicule"),
+    "mts/enginebench":                  ("⚙", "[MTS] Banc de moteur",          "Placer un banc de moteur"),
+    "mts/wheelbench":                   ("🛞", "[MTS] Banc de roues",           "Placer un banc de roues"),
+    "mts/seatbench":                    ("🪑", "[MTS] Banc de sièges",          "Placer un banc de sièges"),
+    "mts/propellerbench":               ("✈", "[MTS] Banc d'hélices",          "Placer un banc d'hélices"),
+    "mts/gunbench":                     ("🔫", "[MTS] Banc d'armes",            "Placer un banc d'armes"),
+    "mts/instrumentbench":              ("🎛", "[MTS] Banc d'instruments",      "Placer un banc d'instruments"),
+    "mts/custombench":                  ("🛠", "[MTS] Banc personnalisé",       "Placer un banc personnalisé"),
+    "mts/decorbench":                   ("🎨", "[MTS] Banc de déco",            "Placer un banc de décoration"),
+    "mts/enginebench":                  ("⚙", "[MTS] Banc moteur",             "Utiliser un banc de moteur"),
+    "mts/rtfm":                         ("📖", "[MTS] Lire le manuel",          "Lire le manuel Immersive Vehicles"),
+}
+
+TROPHIES.update({f"mc_{k}": v for k, v in MC_ADVANCEMENTS.items()})
+TROPHIES.update({f"mod_{k}": v for k, v in MOD_ADVANCEMENTS.items()})
+
+import urllib.parse
+
 NEOFORGE_API = "https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/neoforge"
 NEOFORGE_JAR = "https://maven.neoforged.net/releases/net/neoforged/neoforge/{ver}/neoforge-{ver}-installer.jar"
 
@@ -384,6 +625,7 @@ class SakuraLauncher:
         self._is_admin     = False
         self._announcement_seen_at = 0.0
         self._stats        = load_stats()
+        self._trophies     = load_trophies()
         self._ms_account    = self._cfg.get("ms_account")  # {name, uuid, access_token, refresh_token}
         self._low_pc_mode  = tk.BooleanVar(value=True)
         self._build_ui()
@@ -463,6 +705,7 @@ class SakuraLauncher:
             "mods":         self._page_mods,
             "ressource":    self._page_ressource,
             "shaders":      self._page_shaders,
+            "classement":   self._page_classement,
             "optimisation": self._page_optimisation,
             "reseau":       self._page_reseau,
             "parametres":   self._page_parametres,
@@ -507,6 +750,7 @@ class SakuraLauncher:
             ("mods",         "⚙",  "Mods"),
             ("ressource",    "🖼", "Ressource Packs"),
             ("shaders",      "✨", "Shaderpacks"),
+            ("classement",   "🏆", "Classement"),
             ("optimisation", "⚡", "Optimisation"),
             ("reseau",       "🌐", "Réseau"),
             ("parametres",   "⚙",  "Paramètres"),
@@ -1099,7 +1343,8 @@ class SakuraLauncher:
 
         self._hook_drop_targets(
             (card, self._mods_page_scroll), MODS_DIR, {".jar"},
-            lambda: (self._refresh_mods_page(), self._refresh_mods_list()), "mod")
+            lambda: (self._refresh_mods_page(), self._refresh_mods_list(),
+                     self._unlock_trophy("mod_dropper")), "mod")
 
     def _refresh_mods_page(self):
         for w in self._mods_page_scroll.winfo_children(): w.destroy()
@@ -1197,7 +1442,8 @@ class SakuraLauncher:
 
         self._hook_drop_targets(
             (card, self._sh_scroll), sh_dir, {".zip"},
-            self._refresh_shaders_page, "shaderpack")
+            lambda: (self._refresh_shaders_page(), self._unlock_trophy("shader_installed")),
+            "shaderpack")
 
     def _refresh_shaders_page(self):
         for w in self._sh_scroll.winfo_children(): w.destroy()
@@ -1214,6 +1460,324 @@ class SakuraLauncher:
             size = f"{round(p.stat().st_size/1024)} KB"
             ctk.CTkLabel(r, text=size, text_color=TEXT3,
                          font=ctk.CTkFont(size=11)).pack(side="right", padx=12)
+
+    # ── CLASSEMENT & TROPHÉES ────────────────────────────────────────────────
+
+    def _page_classement(self, f):
+        ctk.CTkLabel(f, text="Classement", font=ctk.CTkFont(size=24, weight="bold"),
+                     text_color=TEXT).pack(anchor="w", padx=24, pady=(18,8))
+        scroll = ctk.CTkScrollableFrame(f, fg_color=BG, scrollbar_button_color=CARD2)
+        scroll.pack(fill="both", expand=True, padx=24, pady=(0,20))
+
+        row = ctk.CTkFrame(scroll, fg_color="transparent")
+        row.pack(fill="x", pady=(0,16))
+
+        lb_c = Card(row, "TABLEAU DE CLASSEMENT")
+        lb_c.pack(side="left", fill="both", expand=True, padx=(0,8))
+        ctk.CTkLabel(
+            lb_c, text="Classé par nombre de lancements, via le serveur de présence.",
+            text_color=TEXT3, font=ctk.CTkFont(size=10)).pack(anchor="w", padx=12, pady=(2,6))
+        self._lb_scroll = ctk.CTkScrollableFrame(lb_c, fg_color=CARD2, height=320)
+        self._lb_scroll.pack(fill="both", expand=True, padx=12, pady=(0,8))
+        ctk.CTkButton(lb_c, text="🔄 Actualiser", height=30,
+                      fg_color=CARD2, border_color=BORDER, border_width=1,
+                      text_color=TEXT2, font=ctk.CTkFont(size=11),
+                      command=self._refresh_leaderboard).pack(fill="x", padx=12, pady=(0,12))
+
+        tr_c = Card(row, "MES TROPHÉES")
+        tr_c.pack(side="right", fill="both", expand=True)
+        ctk.CTkButton(tr_c, text="🏆 Vérifier mes succès Minecraft", height=30,
+                      fg_color=CARD2, border_color=BORDER, border_width=1,
+                      text_color=TEXT2, font=ctk.CTkFont(size=11),
+                      command=lambda: (self._scan_minecraft_advancements(),
+                                        self._sync_trophies_from_server())).pack(
+                      fill="x", padx=12, pady=(2,6))
+        self._trophy_grid = ctk.CTkFrame(tr_c, fg_color="transparent")
+        self._trophy_grid.pack(fill="both", expand=True, padx=12, pady=(0,12))
+        self._refresh_trophy_grid()
+
+        self._refresh_leaderboard()
+
+    def _refresh_trophy_grid(self):
+        for w in self._trophy_grid.winfo_children(): w.destroy()
+        unlocked_count = 0
+        for i, (tid, (icon, name, desc)) in enumerate(TROPHIES.items()):
+            unlocked = tid in self._trophies
+            if unlocked: unlocked_count += 1
+            r = ctk.CTkFrame(self._trophy_grid, fg_color=CARD2 if unlocked else "transparent",
+                              corner_radius=8, border_width=1,
+                              border_color=ACCENT if unlocked else BORDER)
+            r.pack(fill="x", pady=3)
+            ctk.CTkLabel(r, text=icon if unlocked else "🔒",
+                         font=ctk.CTkFont(size=18),
+                         text_color=TEXT if unlocked else TEXT3).pack(side="left", padx=10, pady=8)
+            txt = ctk.CTkFrame(r, fg_color="transparent")
+            txt.pack(side="left", fill="x", expand=True, pady=6)
+            ctk.CTkLabel(txt, text=name, text_color=TEXT if unlocked else TEXT3,
+                         font=ctk.CTkFont(size=12, weight="bold"), anchor="w").pack(fill="x")
+            ctk.CTkLabel(txt, text=desc, text_color=TEXT3,
+                         font=ctk.CTkFont(size=10), anchor="w").pack(fill="x")
+        ctk.CTkLabel(self._trophy_grid,
+                     text=f"{unlocked_count}/{len(TROPHIES)} trophées débloqués",
+                     text_color=ACCENT2, font=ctk.CTkFont(size=11, weight="bold")
+                     ).pack(anchor="w", pady=(8,0))
+
+    def _refresh_leaderboard(self):
+        for w in self._lb_scroll.winfo_children(): w.destroy()
+        url = self.server_url.get().strip()
+        if not url:
+            ctk.CTkLabel(self._lb_scroll,
+                         text="Configure le serveur de présence dans Paramètres\npour voir le classement.",
+                         text_color=TEXT3, font=ctk.CTkFont(size=11), justify="left").pack(pady=10)
+            return
+        ctk.CTkLabel(self._lb_scroll, text="Chargement...",
+                     text_color=TEXT3, font=ctk.CTkFont(size=11)).pack(pady=10)
+        def run():
+            try:
+                req = urllib.request.Request(url.rstrip("/") + "/leaderboard", method="GET")
+                with urllib.request.urlopen(req, timeout=5) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+                rows = data.get("leaderboard", [])
+            except Exception:
+                rows = None
+            if rows:
+                for row in rows[:50]:
+                    self._fetch_player_head(row.get("username", "?"))
+            self.root.after(0, lambda: self._render_leaderboard(rows))
+        threading.Thread(target=run, daemon=True).start()
+
+    def _fetch_player_head(self, username, size=24):
+        key = (username.lower(), size)
+        if key in _AVATAR_CACHE:
+            return _AVATAR_CACHE[key]
+        try:
+            from PIL import Image
+            import io
+            url = f"https://minotar.net/avatar/{urllib.parse.quote(username)}/{size}.png"
+            data = urllib.request.urlopen(url, timeout=4).read()
+            img = Image.open(io.BytesIO(data)).convert("RGBA").resize(
+                (size, size), Image.NEAREST)
+            _AVATAR_CACHE[key] = img
+            return img
+        except Exception:
+            _AVATAR_CACHE[key] = None
+            return None
+
+    def _render_leaderboard(self, rows):
+        for w in self._lb_scroll.winfo_children(): w.destroy()
+        if rows is None:
+            ctk.CTkLabel(self._lb_scroll, text="Serveur inaccessible.",
+                         text_color=RED_C, font=ctk.CTkFont(size=11)).pack(pady=10)
+            return
+        if not rows:
+            ctk.CTkLabel(self._lb_scroll, text="Personne n'a encore de lancement enregistré.",
+                         text_color=TEXT3, font=ctk.CTkFont(size=11)).pack(pady=10)
+            return
+        current = self.username.get().strip()
+        medals = {0: "🥇", 1: "🥈", 2: "🥉"}
+        for i, row in enumerate(rows):
+            name = row.get("username", "?")
+            r = ctk.CTkFrame(self._lb_scroll,
+                              fg_color=ACT_BG if name == current else "transparent")
+            r.pack(fill="x", pady=2)
+            rank_txt = medals.get(i, f"#{i+1}")
+            ctk.CTkLabel(r, text=rank_txt, width=36,
+                         font=ctk.CTkFont(size=13, weight="bold"),
+                         text_color=ACCENT2 if i < 3 else TEXT3).pack(side="left", padx=(8,4))
+            head_img = _AVATAR_CACHE.get((name.lower(), 24))
+            if head_img is not None:
+                head_ck = ctk.CTkImage(light_image=head_img, dark_image=head_img, size=(24, 24))
+                ctk.CTkLabel(r, image=head_ck, text="").pack(side="left", padx=(0, 6))
+            else:
+                ctk.CTkLabel(r, text="🧑", width=24,
+                             font=ctk.CTkFont(size=14)).pack(side="left", padx=(0, 6))
+            ctk.CTkLabel(r, text=name + (" (vous)" if name == current else ""),
+                         text_color=TEXT, font=ctk.CTkFont(size=12,
+                         weight="bold" if name == current else "normal")).pack(side="left")
+            ctk.CTkLabel(r, text=f"{row.get('launches',0)} lancements · 🏆 {row.get('trophies',0)}",
+                         text_color=TEXT3, font=ctk.CTkFont(size=11)).pack(side="right", padx=10)
+
+    def _unlock_trophy(self, trophy_id):
+        if trophy_id in self._trophies:
+            return
+        if trophy_id not in TROPHIES:
+            return
+        self._trophies[trophy_id] = time.time()
+        save_trophies(self._trophies)
+        icon, name, desc = TROPHIES[trophy_id]
+        self._add_log(f"Trophée débloqué : {icon} {name} — {desc}")
+        self._show_trophy_popup(icon, name)
+        grid = getattr(self, "_trophy_grid", None)
+        if grid is not None:
+            try: self._refresh_trophy_grid()
+            except Exception: pass
+        url = self.server_url.get().strip()
+        uname = self.username.get().strip()
+        if url and uname:
+            def run():
+                try:
+                    req = urllib.request.Request(
+                        url.rstrip("/") + "/trophy",
+                        data=json.dumps({"username": uname, "trophy_id": trophy_id}).encode("utf-8"),
+                        headers={"Content-Type": "application/json"},
+                        method="POST")
+                    urllib.request.urlopen(req, timeout=5).read()
+                except Exception:
+                    pass
+            threading.Thread(target=run, daemon=True).start()
+
+    def _show_trophy_popup(self, icon, name):
+        try:
+            popup = tk.Toplevel(self.root)
+            popup.overrideredirect(True)
+            popup.attributes("-topmost", True)
+            try:
+                popup.attributes("-alpha", 0.96)
+            except Exception:
+                pass
+            frame = ctk.CTkFrame(popup, fg_color=CARD, corner_radius=10,
+                                  border_width=2, border_color=ACCENT)
+            frame.pack(fill="both", expand=True)
+            ctk.CTkLabel(frame, text=icon, font=ctk.CTkFont(size=28)).pack(
+                side="left", padx=(14,8), pady=12)
+            txt = ctk.CTkFrame(frame, fg_color="transparent")
+            txt.pack(side="left", padx=(0,16), pady=12)
+            ctk.CTkLabel(txt, text="Trophée débloqué !", text_color=ACCENT2,
+                         font=ctk.CTkFont(size=11, weight="bold")).pack(anchor="w")
+            ctk.CTkLabel(txt, text=name, text_color=TEXT,
+                         font=ctk.CTkFont(size=14, weight="bold")).pack(anchor="w")
+            self.root.update_idletasks()
+            w, h = 280, 64
+            x = self.root.winfo_x() + self.root.winfo_width() - w - 24
+            y = self.root.winfo_y() + self.root.winfo_height() - h - 24
+            popup.geometry(f"{w}x{h}+{x}+{y}")
+            popup.after(4000, popup.destroy)
+        except Exception:
+            pass
+
+    def _check_launch_trophies(self, launches_count):
+        self._unlock_trophy("first_launch")
+        if launches_count >= 10:  self._unlock_trophy("launches_10")
+        if launches_count >= 50:  self._unlock_trophy("launches_50")
+        if launches_count >= 200: self._unlock_trophy("launches_200")
+
+    def _scan_minecraft_advancements(self):
+        uname = self.username.get().strip()
+        if not uname:
+            return
+        uid = (self._ms_account.get("id") if self._ms_account else None) or offline_uuid(uname)
+        def run():
+            found_mc  = set()
+            found_mod = set()
+            dot_mc = Path.home() / "AppData" / "Roaming" / ".minecraft"
+            saves_dirs = [MC_DIR / "saves", dot_mc / "saves"]
+            # Aussi chercher dans "sakura laucher" s'il existe à côté
+            laucher_dir = BASE_DIR.parent / "sakura laucher" / "minecraft" / "saves"
+            if laucher_dir.exists():
+                saves_dirs.append(laucher_dir)
+            worlds = []
+            for saves_dir in saves_dirs:
+                try:
+                    if saves_dir.exists():
+                        worlds.extend(saves_dir.iterdir())
+                except Exception:
+                    pass
+            for world in worlds:
+                candidates = [
+                    world / "advancements" / f"{uid}.json",
+                    world / "players" / "advancements" / f"{uid}.json",
+                ]
+                for adv_file in candidates:
+                    try:
+                        if adv_file.exists():
+                            data = json.loads(adv_file.read_text("utf-8"))
+                            for adv_id, info in data.items():
+                                if not (isinstance(info, dict) and info.get("done")):
+                                    continue
+                                if adv_id.startswith("minecraft:"):
+                                    found_mc.add(adv_id[len("minecraft:"):])
+                                else:
+                                    # Mods : "farmersdelight:main/craft_knife" → "farmersdelight/craft_knife"
+                                    ns, _, path = adv_id.partition(":")
+                                    # Enlève le sous-dossier "main/" pour matcher MOD_ADVANCEMENTS
+                                    path = path.replace("main/", "").replace("combat/", "")
+                                    found_mod.add(f"{ns}/{path}")
+                    except Exception:
+                        continue
+            matched_mc  = [k for k in MC_ADVANCEMENTS  if k in found_mc]
+            matched_mod = [k for k in MOD_ADVANCEMENTS if k in found_mod]
+            total = len(matched_mc) + len(matched_mod)
+            if total:
+                def unlock_all():
+                    for k in matched_mc:  self._unlock_trophy(f"mc_{k}")
+                    for k in matched_mod: self._unlock_trophy(f"mod_{k}")
+                self.root.after(0, unlock_all)
+            else:
+                self.root.after(0, lambda: self._add_log(
+                    "Aucun nouveau succès détecté dans les sauvegardes locales"))
+        threading.Thread(target=run, daemon=True).start()
+
+    def _sync_trophies_from_server(self):
+        url = self.server_url.get().strip()
+        uname = self.username.get().strip()
+        if not url or not uname:
+            return
+        def run():
+            try:
+                req = urllib.request.Request(
+                    url.rstrip("/") + f"/trophies?username={urllib.parse.quote(uname)}")
+                data = json.loads(urllib.request.urlopen(req, timeout=5).read())
+                remote = data.get("trophies", {})
+            except Exception:
+                return
+            ids = [tid for tid in remote if tid in TROPHIES]
+            removed = [tid for tid in self._trophies
+                       if tid.startswith("mc_") and tid not in remote]
+            def apply():
+                changed = False
+                for tid in removed:
+                    if self._trophies.pop(tid, None) is not None:
+                        changed = True
+                for tid in ids:
+                    self._unlock_trophy(tid)
+                if changed:
+                    save_trophies(self._trophies)
+                    grid = getattr(self, "_trophy_grid", None)
+                    if grid is not None:
+                        try: self._refresh_trophy_grid()
+                        except Exception: pass
+            self.root.after(0, apply)
+        threading.Thread(target=run, daemon=True).start()
+
+    def _report_launch_to_server(self, username):
+        url = self.server_url.get().strip()
+        if not url or not username:
+            return
+        def run():
+            try:
+                req = urllib.request.Request(
+                    url.rstrip("/") + "/launch",
+                    data=json.dumps({"username": username}).encode("utf-8"),
+                    headers={"Content-Type": "application/json"},
+                    method="POST")
+                urllib.request.urlopen(req, timeout=5).read()
+            except Exception:
+                pass
+        threading.Thread(target=run, daemon=True).start()
+
+    def _ensure_trophy_mod(self, version_id):
+        if "neoforge" not in version_id.lower() and "neoforged" not in version_id.lower():
+            return
+        src = resource_path("sakura_trophy.jar")
+        if not src.exists():
+            return
+        dest = MODS_DIR / "sakura_trophy.jar"
+        try:
+            if not dest.exists() or dest.stat().st_size != src.stat().st_size:
+                shutil.copy2(src, dest)
+                self._add_log("Mod SakuraTrophy mis à jour dans mods/")
+        except Exception as e:
+            self._add_log(f"Impossible de copier sakura_trophy.jar : {e}")
 
     # ── OPTIMISATION ──────────────────────────────────────────────────────────
 
@@ -1823,6 +2387,8 @@ class SakuraLauncher:
             self._install_skin_files(path)
         self._save_config()
         self._add_log(f"Skin appliqué : {name}")
+        if path and Path(path).exists():
+            self._unlock_trophy("skin_custom")
 
     def _install_skin_files(self, skin_path):
         """Copie le skin + configure CustomSkinLoader pour les fichiers locaux."""
@@ -2108,6 +2674,9 @@ class SakuraLauncher:
                 self._stats = record_launch(uname)
                 self.root.after(0, self._refresh_users_count_label)
                 self.root.after(0, self._safe_refresh_members_list)
+                self.root.after(0, lambda n=self._stats["launches"]: self._check_launch_trophies(n))
+                self._ensure_trophy_mod(vid)
+                self._report_launch_to_server(uname)
                 self._rpc_update(state=f"En train de jouer {vid} — {uname}")
                 if self.close_on_launch.get():
                     self.root.after(2000, self.root.destroy)
@@ -2648,6 +3217,8 @@ class SakuraLauncher:
             admins = set(data.get("admins", []))
             current = self.username.get().strip()
             self._is_admin = current in admins
+            if self._is_admin:
+                self._unlock_trophy("admin")
             prev_count = self._online_count
             self._online_count, self._online_users = len(users), users
             self._online_dot.configure(text="● Connecté", text_color=GREEN)

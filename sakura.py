@@ -114,19 +114,197 @@ def offline_uuid(username):
 # Sous-ensemble des succès vanilla les plus connus. clé = id d'avancement
 # Minecraft (sans le namespace "minecraft:"), valeur = (icône, nom, desc).
 MC_ADVANCEMENTS = {
-    "story/mine_stone":      ("⛏", "Pierre angulaire",      "Miner de la pierre avec une pioche en bois"),
-    "story/smelt_iron":      ("🔧", "Acquisition de fer",     "Fondre un lingot de fer"),
-    "story/obtain_armor":    ("🪖", "Habillé pour l'occasion", "Porter une pièce d'armure en fer"),
-    "story/mine_diamond":    ("💎", "Diamants !",             "Obtenir un diamant"),
-    "story/enter_the_nether": ("🔥", "Nous devons creuser plus profond", "Construire, allumer et entrer dans un portail du Nether"),
-    "story/enter_the_end":   ("🌌", "La fin ?",               "Entrer dans le portail de l'End"),
-    "end/kill_dragon":       ("🐉", "Libérer la fin",         "Tuer le dragon de l'End"),
-    "nether/find_fortress":  ("🏰", "Une terrible fortresse", "Trouver une forteresse du Nether"),
-    "husbandry/balanced_diet": ("🍗", "Régime équilibré",     "Manger tous les aliments du jeu"),
-    "adventure/kill_a_mob":  ("⚔", "Monstre Hunter",          "Tuer une créature hostile"),
-    "story/follow_ender_eye": ("👁", "Voyage vers l'End",     "Suivre un œil de l'Ender"),
+    # Histoire
+    "story/root":              ("🪵", "Âge de pierre",           "Ramasser du bois"),
+    "story/mine_stone":        ("⛏", "Pierre angulaire",         "Miner de la pierre avec une pioche en bois"),
+    "story/smelt_iron":        ("🔧", "Acquisition de fer",       "Fondre un lingot de fer"),
+    "story/iron_tools":        ("⛏", "C'est un pic en fer !",    "Fabriquer une pioche en fer"),
+    "story/obtain_armor":      ("🪖", "Habillé pour l'occasion",  "Porter une pièce d'armure en fer"),
+    "story/lava_bucket":       ("🪣", "Hot Stuff",                "Remplir un seau de lave"),
+    "story/deflect_arrow":     ("🏹", "Pas aujourd'hui",          "Dévier une flèche avec un bouclier"),
+    "story/form_obsidian":     ("🔵", "Seau de glace",            "Obtenir de l'obsidienne"),
+    "story/mine_diamond":      ("💎", "Diamants !",               "Obtenir un diamant"),
+    "story/shiny_gear":        ("💎", "Couvrez-moi de diamants",  "Porter une armure en diamant"),
+    "story/upgrade_tools":     ("⬆", "Diamants pour vous !",     "Obtenir un outil en diamant"),
+    "story/enchant_item":      ("✨", "Enchanteur",               "Enchanter un objet"),
+    "story/cure_zombie_villager": ("🧟", "Docteur Zombie",        "Soigner un villageois zombie"),
+    "story/enter_the_nether":  ("🔥", "Nous devons creuser",      "Entrer dans le Nether"),
+    "story/follow_ender_eye":  ("👁", "Espion",                   "Suivre un œil de l'Ender"),
+    "story/enter_the_end":     ("🌌", "La fin ?",                 "Entrer dans l'End"),
+    # Nether
+    "nether/root":             ("🔥", "Dans le Nether",           "Entrer dans le Nether"),
+    "nether/find_fortress":    ("🏰", "Une terrible fortresse",   "Trouver une forteresse du Nether"),
+    "nether/obtain_blaze_rod": ("🔮", "Bâton de Blaze",           "Obtenir un bâton de Blaze"),
+    "nether/brew_potion":      ("🧪", "Première potion",          "Brasser une potion"),
+    "nether/uneasy_alliance":  ("🐷", "Alliance risquée",         "Ramener un Ghast dans l'Overworld"),
+    "nether/get_wither_skull": ("💀", "Crâne de Wither",          "Obtenir un crâne de Wither"),
+    "nether/summon_wither":    ("💥", "Wither invoqué",           "Invoquer le Wither"),
+    "nether/create_beacon":    ("🏛", "Beacon créé",              "Construire et activer un beacon"),
+    "nether/create_full_beacon":("👑","Beacon pleine puissance",  "Activer un beacon au niveau 4"),
+    "nether/ride_strider":     ("🦎", "Chevaucher le Strider",    "Monter un Strider en lave"),
+    "nether/ride_strider_in_overworld_lava": ("🌋", "Strider en overworld", "Strider dans la lave de l'Overworld"),
+    "nether/explore_nether":   ("🗺", "Explorer le Nether",       "Visiter tous les biomes du Nether"),
+    "nether/fast_travel":      ("⚡", "Voyage éclair",            "Voyager 7km via le Nether"),
+    "nether/find_bastion":     ("🏯", "Bastion trouvé",           "Trouver un bastion"),
+    "nether/loot_bastion":     ("💰", "Piller le Bastion",        "Fouiller un coffre dans un bastion"),
+    "nether/obtain_ancient_debris": ("⛏", "Débris anciens",      "Obtenir des débris anciens"),
+    "nether/obtain_crying_obsidian": ("🗿", "Obsidienne pleurante","Obtenir de l'obsidienne pleurante"),
+    "nether/use_lodestone":    ("⚓", "Lodestone",                "Utiliser une boussole sur un lodestone"),
+    "nether/netherite_armor":  ("🛡", "Armure Netherite",         "Porter une armure complète en Netherite"),
+    "nether/all_potions":      ("💊", "Toutes les potions",       "Avoir l'effet de toutes les potions"),
+    "nether/all_effects":      ("🌀", "Tous les effets",          "Avoir tous les effets de statut"),
+    "nether/distract_piglin":  ("🐗", "Distraire un Piglin",      "Faire du troc avec un Piglin"),
+    "nether/return_to_sender": ("🔄", "Retour à l'envoyeur",      "Détruire un Ghast avec sa propre boule de feu"),
+    "nether/charge_respawn_anchor": ("⚡", "Anchor chargée",      "Charger un point de réapparition Nether"),
+    # The End
+    "end/root":                ("🌌", "Dans l'End",               "Entrer dans l'End"),
+    "end/kill_dragon":         ("🐉", "Libérer la fin",           "Tuer le dragon de l'End"),
+    "end/dragon_egg":          ("🥚", "Oeuf du Dragon",           "Obtenir l'oeuf du Dragon"),
+    "end/dragon_breath":       ("💨", "Souffle du Dragon",        "Collecter le souffle du Dragon"),
+    "end/enter_end_gateway":   ("🌀", "Gateway de l'End",         "Sauter dans un portail End Gateway"),
+    "end/find_end_city":       ("🏙", "Cité de l'End",            "Trouver une cité de l'End"),
+    "end/elytra":              ("🪂", "Elytra",                   "Trouver des Elytra"),
+    "end/levitate":            ("🎈", "Lévitation",               "Atteindre 50 blocs avec un effet Shulker"),
+    "end/respawn_dragon":      ("🐉", "Dragon réinvoqué",         "Réinvoquer le dragon de l'End"),
+    # Aventure
+    "adventure/root":          ("🗺", "Aventure",                 "Trouver quelque chose de nouveau"),
+    "adventure/kill_a_mob":    ("⚔", "Monstre Hunter",            "Tuer une créature hostile"),
+    "adventure/kill_all_mobs": ("🗡", "Monster Hunter Avancé",    "Tuer toutes les créatures"),
+    "adventure/shoot_arrow":   ("🏹", "Tir à l'arc",              "Tirer une flèche"),
+    "adventure/bullseye":      ("🎯", "Dans le mille",            "Tirer dans le centre d'une cible"),
+    "adventure/sniper_duel":   ("🎯", "Duel de snipers",          "Tuer un squelette à 50 blocs"),
+    "adventure/sleep_in_bed":  ("🛏", "Bonne nuit",               "Dormir dans un lit"),
+    "adventure/hero_of_the_village": ("🏰", "Héros du village",   "Sauver un village d'un raid"),
+    "adventure/voluntary_exile": ("🚪", "Exil volontaire",        "Tuer un capitaine de pillards"),
+    "adventure/summon_iron_golem": ("🤖", "Golem de fer",         "Construire un golem de fer"),
+    "adventure/adventuring_time": ("🗺", "Temps d'aventure",      "Visiter tous les biomes"),
+    "adventure/trade":         ("💰", "Commerce",                 "Faire du commerce avec un villageois"),
+    "adventure/very_very_frightening": ("⚡", "Très effrayant",   "Frapper un villageois avec la foudre"),
+    "adventure/honey_block_slide": ("🍯", "Glissade de miel",     "Glisser sur un bloc de miel"),
+    "adventure/walk_on_powder_snow_with_leather_boots": ("🌨", "Neige poudreuse", "Marcher sur de la neige poudreuse avec des bottes en cuir"),
+    "adventure/play_jukebox_in_meadows": ("🎶", "Jukebox dans la prairie", "Jouer de la musique dans une prairie"),
+    "adventure/arbalistic":    ("🎯", "Balistique",               "Tuer 5 créatures uniques avec une arbalète"),
+    "adventure/two_birds_one_arrow": ("🏹", "2 oiseaux 1 flèche", "Tuer 2 Phantoms avec 1 flèche"),
+    "adventure/overoverkill":  ("💀", "Overkill",                 "Infliger 50 dégâts en un coup"),
+    "adventure/avoid_vibration": ("🌀", "Sans vibrations",        "Passer près d'un Sculk Sensor sans le déclencher"),
+    "adventure/lighten_up":    ("💡", "Éclairé",                  "Soigner un Strider avec un champignon tordu"),
+    "adventure/kill_mob_near_sculk_catalyst": ("🗿", "Sculk Catalyst", "Tuer une créature près d'un Sculk Catalyst"),
+    "adventure/throw_trident": ("🔱", "Triton lancé",             "Lancer un triton"),
+    "adventure/totem_of_undying": ("🌿", "Totem de survie",       "Utiliser un totem d'immortalité"),
+    "adventure/trim_with_any_armor_pattern": ("🪖", "Armure décorée", "Décorer une armure"),
+    "adventure/trim_with_all_exclusive_armor_patterns": ("✨", "Tous les motifs", "Tous les motifs exclusifs d'armure"),
+    "adventure/craft_decorated_pot_using_only_sherds": ("🏺", "Pot de tessons", "Fabriquer un pot décoré avec 4 tessons"),
+    "adventure/salvage_sherd": ("🗿", "Tesson sauvé",             "Obtenir un tesson avec une brosse"),
+    "adventure/read_power_of_chiseled_bookshelf": ("📖", "Bibliothèque ciselée", "Lire un livre dans une bibliothèque ciselée"),
+    "adventure/under_lock_and_key": ("🔑", "Sous clé",            "Ouvrir un coffre de chambre d'essais"),
+    "adventure/revaulting":    ("🔄", "Revaulting",               "Réutiliser une clé sur un coffre déjà ouvert"),
+    "adventure/minecraft_trials_edition": ("🎮", "Trials Edition", "Compléter une chambre d'essais"),
+    "adventure/crafters_crafting_crafters": ("⚙", "Crafters en série", "Enchaîner des Crafters automatiques"),
+    "adventure/who_needs_rockets": ("🦅", "Qui a besoin de fusées", "Voler avec Elytra via une arbalète"),
+    "adventure/trade_at_world_height": ("🏡", "Commerce en altitude", "Trader à y=320"),
+    "adventure/fall_from_world_height": ("📉", "Chute extrême",   "Tomber depuis y=320"),
+    "adventure/ol_betsy":      ("🔫", "Old Betsy",               "Charger une arbalète"),
+    "adventure/blowback":      ("💨", "Blowback",                "Tuer avec un feu d'artifice d'arbalète"),
+    "adventure/brush_armadillo": ("🦔", "Brosser une armadille",  "Brosser une armadille"),
+    "adventure/lightning_rod_with_villager_no_fire": ("⚡", "Paratonnerre", "Protéger un villageois avec un paratonnerre"),
+    "adventure/spyglass_at_dragon": ("🔭", "Longue-vue dragon",   "Observer le dragon avec une longue-vue"),
+    "adventure/spyglass_at_ghast": ("🔭", "Longue-vue Ghast",    "Observer un Ghast avec une longue-vue"),
+    "adventure/spyglass_at_parrot": ("🔭", "Longue-vue perroquet","Observer un perroquet avec une longue-vue"),
+    "adventure/whos_the_pillager_now": ("🪓", "Désarmer le Pillard", "Prendre l'arbalète d'un Pillard"),
+    # Agriculture
+    "husbandry/root":          ("🌱", "Agriculture",              "Planter une graine"),
+    "husbandry/plant_seed":    ("🌱", "Planter une graine",       "Planter une graine et la voir pousser"),
+    "husbandry/breed_an_animal": ("🐄", "Élever un animal",       "Élever deux animaux"),
+    "husbandry/tame_an_animal": ("🐕", "Apprivoiser",             "Apprivoiser un animal"),
+    "husbandry/fishy_business": ("🎣", "Affaire de poisson",      "Attraper un poisson"),
+    "husbandry/tactical_fishing": ("🐟", "Pêche tactique",        "Attraper un poisson dans un seau"),
+    "husbandry/axolotl_in_a_bucket": ("🪸", "Axolotl en seau",   "Capturer un axolotl dans un seau"),
+    "husbandry/tadpole_in_a_bucket": ("🐸", "Têtard en seau",    "Capturer un têtard dans un seau"),
+    "husbandry/safely_harvest_honey": ("🍯", "Récolte de miel",   "Récolter du miel sans se faire piquer"),
+    "husbandry/silk_touch_nest": ("🐝", "Nid en soie",            "Déplacer une ruche avec Toucher de soie"),
+    "husbandry/make_a_sign_glow": ("🪵", "Panneau lumineux",      "Faire briller un panneau"),
+    "husbandry/balanced_diet": ("🍗", "Régime équilibré",         "Manger tous les aliments du jeu"),
+    "husbandry/complete_catalogue": ("🐈", "Catalogue complet",   "Apprivoiser tous les chats"),
+    "husbandry/bred_all_animals": ("🐄", "Élevage complet",       "Élever une paire de chaque animal élevable"),
+    "husbandry/wax_on":        ("🐝", "Cire appliquée",           "Appliquer de la cire sur du cuivre"),
+    "husbandry/wax_off":       ("🧽", "Cire retirée",             "Retirer la cire du cuivre"),
+    "husbandry/allay_deliver_item_to_player": ("🎵", "Allay livre un objet", "Recevoir un objet d'un Allay"),
+    "husbandry/allay_deliver_cake_to_note_block": ("🎂", "Allay livre un gâteau", "Allay dépose un gâteau sur un Bloc Note"),
+    "husbandry/ride_a_boat_with_a_goat": ("🐐", "Bateau + chèvre","Embarquer une chèvre dans un bateau"),
+    "husbandry/whole_pack":    ("🐾", "Meute complète",           "Apprivoiser tous les types de loups"),
+    "husbandry/leash_all_frog_variants": ("🐸", "Toutes les grenouilles", "Avoir les 3 variantes de grenouilles"),
+    "husbandry/froglights":    ("💡", "Froglights",               "Obtenir les 3 types de Froglights"),
+    "husbandry/kill_axolotl_target": ("🪸", "Chasse à l'axolotl", "Tuer une créature avec un axolotl"),
+    "husbandry/obtain_sniffer_egg": ("🦕", "Oeuf de Sniffer",    "Obtenir un oeuf de Sniffer"),
+    "husbandry/plant_any_sniffer_seed": ("🌺", "Graine Sniffer",  "Planter une graine trouvée par un Sniffer"),
+    "husbandry/feed_snifflet": ("🦕", "Nourrir Snifflet",         "Nourrir un bébé Sniffer"),
+    "husbandry/obtain_netherite_hoe": ("⛏", "Houe en Netherite", "Obtenir une houe en Netherite"),
+    "husbandry/repair_wolf_armor": ("🐺", "Réparer armure loup",  "Réparer l'armure d'un loup"),
+    "husbandry/remove_wolf_armor": ("🐺", "Retirer armure loup",  "Retirer l'armure d'un loup"),
 }
+
+MOD_ADVANCEMENTS = {
+    # Farmer's Delight
+    "farmersdelight/root":              ("🍽", "[FD] Délices fermiers",        "Découvrir Farmer's Delight"),
+    "farmersdelight/craft_knife":       ("🔪", "[FD] Premier couteau",         "Fabriquer un couteau"),
+    "farmersdelight/obtain_netherite_knife": ("🔪", "[FD] Couteau Netherite",  "Obtenir un couteau en Netherite"),
+    "farmersdelight/eat_nourishing_food": ("🍲", "[FD] Bien nourri",           "Manger un plat nourrissant"),
+    "farmersdelight/get_fd_seed":       ("🌿", "[FD] Graine spéciale",         "Obtenir une graine Farmer's Delight"),
+    "farmersdelight/get_ham":           ("🥩", "[FD] Jambon",                  "Obtenir du jambon"),
+    "farmersdelight/get_mushroom_colony": ("🍄", "[FD] Colonie de champignons","Obtenir une colonie de champignons"),
+    "farmersdelight/get_rich_soil":     ("🌱", "[FD] Terre riche",             "Obtenir de la terre riche"),
+    "farmersdelight/harvest_ropelogged_tomato": ("🍅", "[FD] Récolte tomates", "Récolter des tomates sur corde"),
+    "farmersdelight/harvest_straw":     ("🌾", "[FD] Récolte de paille",       "Récolter de la paille"),
+    "farmersdelight/hit_raider_with_rotten_tomato": ("🍅", "[FD] Tomate pourrie","Frapper un pillard avec une tomate pourrie"),
+    "farmersdelight/master_chef":       ("👨‍🍳", "[FD] Maître chef",           "Cuisiner tous les plats Farmer's Delight"),
+    "farmersdelight/place_campfire":    ("🔥", "[FD] Feu de camp",             "Placer un feu de camp pour cuisiner"),
+    "farmersdelight/place_cooking_pot": ("🍲", "[FD] Marmite",                 "Placer une marmite"),
+    "farmersdelight/place_feast":       ("🎉", "[FD] Festin",                  "Préparer un festin"),
+    "farmersdelight/place_organic_compost": ("♻", "[FD] Compost organique",    "Placer un compost organique"),
+    "farmersdelight/place_skillet":     ("🍳", "[FD] Poêle",                   "Placer une poêle"),
+    "farmersdelight/plant_all_crops":   ("🌽", "[FD] Toutes les cultures",     "Planter toutes les cultures FD"),
+    "farmersdelight/plant_rice":        ("🌾", "[FD] Rizière",                 "Planter du riz"),
+    "farmersdelight/use_cutting_board": ("🪵", "[FD] Planche à découper",      "Utiliser une planche à découper"),
+    "farmersdelight/use_skillet":       ("🍳", "[FD] Cuisson à la poêle",      "Cuisiner avec une poêle"),
+    # More Delight
+    "moredelight/root":                 ("🍴", "[MD] More Delight",            "Découvrir More Delight"),
+    "moredelight/stone_knife":          ("🔪", "[MD] Couteau en pierre",        "Fabriquer un couteau en pierre"),
+    "moredelight/wooden_knife":         ("🔪", "[MD] Couteau en bois",          "Fabriquer un couteau en bois"),
+    "moredelight/get_chicken_sandwich_with_egg_and_tomato": ("🥪", "[MD] Sandwich poulet", "Préparer un sandwich poulet-oeuf-tomate"),
+    "moredelight/get_cooked_rice_with": ("🍚", "[MD] Riz cuisiné",             "Préparer du riz cuisiné"),
+    "moredelight/get_creamy_pasta_with_ham": ("🍝", "[MD] Pasta jambon",       "Préparer des pâtes crémeuses au jambon"),
+    "moredelight/get_diced_potatoes_with": ("🥔", "[MD] Pommes de terre",      "Préparer des pommes de terre coupées"),
+    "moredelight/get_egg_with_bacon_sandwich": ("🥚", "[MD] Sandwich oeuf-bacon","Préparer un sandwich oeuf-bacon"),
+    "moredelight/get_mashed_potatoes":  ("🥔", "[MD] Purée",                   "Préparer de la purée de pommes de terre"),
+    "moredelight/get_omelette":         ("🍳", "[MD] Omelette",                "Préparer une omelette"),
+    "moredelight/get_toast_with_egg":   ("🍞", "[MD] Toast à l'oeuf",          "Préparer un toast à l'oeuf"),
+    # Immersive Vehicles (MTS)
+    "mts/root":            ("🚗", "[MTS] Véhicules",              "Découvrir Immersive Vehicles"),
+    "mts/wrench":          ("🔧", "[MTS] Clé à molette",          "Obtenir une clé à molette"),
+    "mts/key":             ("🔑", "[MTS] Clé de véhicule",        "Obtenir une clé de véhicule"),
+    "mts/fuelpump":        ("⛽", "[MTS] Pompe à carburant",      "Placer une pompe à carburant"),
+    "mts/fuelhose":        ("🪣", "[MTS] Tuyau de carburant",     "Utiliser un tuyau de carburant"),
+    "mts/jerrycan":        ("⛽", "[MTS] Jerrican",               "Utiliser un jerrican"),
+    "mts/paintgun":        ("🎨", "[MTS] Pistolet de peinture",   "Peindre un véhicule"),
+    "mts/partscanner":     ("📡", "[MTS] Scanner de pièces",      "Scanner un véhicule"),
+    "mts/jumpercable":     ("🔋", "[MTS] Câble de démarrage",     "Utiliser un câble de démarrage"),
+    "mts/jumperpack":      ("🎒", "[MTS] Pack de démarrage",      "Utiliser un pack de démarrage"),
+    "mts/ticket":          ("🎫", "[MTS] Ticket",                 "Obtenir un ticket de bus"),
+    "mts/itembench":       ("🪑", "[MTS] Banc à objets",          "Placer un banc à objets MTS"),
+    "mts/vehiclebench":    ("🚗", "[MTS] Banc de véhicule",       "Placer un banc de véhicule"),
+    "mts/enginebench":     ("⚙", "[MTS] Banc de moteur",          "Placer un banc de moteur"),
+    "mts/wheelbench":      ("🛞", "[MTS] Banc de roues",           "Placer un banc de roues"),
+    "mts/seatbench":       ("🪑", "[MTS] Banc de sièges",          "Placer un banc de sièges"),
+    "mts/propellerbench":  ("✈", "[MTS] Banc d'hélices",          "Placer un banc d'hélices"),
+    "mts/gunbench":        ("🔫", "[MTS] Banc d'armes",            "Placer un banc d'armes"),
+    "mts/instrumentbench": ("🎛", "[MTS] Banc d'instruments",      "Placer un banc d'instruments"),
+    "mts/custombench":     ("🛠", "[MTS] Banc personnalisé",       "Placer un banc personnalisé"),
+    "mts/decorbench":      ("🎨", "[MTS] Banc de déco",            "Placer un banc de décoration"),
+    "mts/rtfm":            ("📖", "[MTS] Lire le manuel",          "Lire le manuel Immersive Vehicles"),
+}
+
 TROPHIES.update({f"mc_{k}": v for k, v in MC_ADVANCEMENTS.items()})
+TROPHIES.update({f"mod_{k}": v for k, v in MOD_ADVANCEMENTS.items()})
 
 DISCORD_SUPPORT_URL = "https://discord.gg/zqw8KGKWJ"
 
@@ -2985,10 +3163,14 @@ class SakuraLauncher:
         uid = (self._ms_account.get("id") if self._ms_account else None) or offline_uuid(uname)
 
         def run():
-            found = set()
-            # Cherche dans le dossier du launcher ET dans .minecraft standard
+            found_mc  = set()
+            found_mod = set()
             dot_mc = Path.home() / "AppData" / "Roaming" / ".minecraft"
             saves_dirs = [MC_DIR / "saves", dot_mc / "saves"]
+            # Cherche aussi dans "sakura laucher" s'il existe à côté
+            laucher_dir = BASE_DIR.parent / "sakura laucher" / "minecraft" / "saves"
+            if laucher_dir.exists():
+                saves_dirs.append(laucher_dir)
             worlds = []
             for saves_dir in saves_dirs:
                 try:
@@ -2997,8 +3179,6 @@ class SakuraLauncher:
                 except Exception:
                     pass
             for world in worlds:
-                # Minecraft moderne : saves/<monde>/advancements/<uuid>.json
-                # Minecraft ancien : saves/<monde>/players/advancements/<uuid>.json
                 candidates = [
                     world / "advancements" / f"{uid}.json",
                     world / "players" / "advancements" / f"{uid}.json",
@@ -3008,16 +3188,28 @@ class SakuraLauncher:
                         if adv_file.exists():
                             data = json.loads(adv_file.read_text("utf-8"))
                             for adv_id, info in data.items():
-                                if isinstance(info, dict) and info.get("done") and adv_id.startswith("minecraft:"):
-                                    found.add(adv_id[len("minecraft:"):])
+                                if not (isinstance(info, dict) and info.get("done")):
+                                    continue
+                                if adv_id.startswith("minecraft:"):
+                                    found_mc.add(adv_id[len("minecraft:"):])
+                                else:
+                                    # Mods : "farmersdelight:main/craft_knife" → "farmersdelight/craft_knife"
+                                    ns, _, path = adv_id.partition(":")
+                                    path = path.replace("main/", "").replace("combat/", "")
+                                    found_mod.add(f"{ns}/{path}")
                     except Exception:
                         continue
-            matched = [k for k in MC_ADVANCEMENTS if k in found]
-            if matched:
-                self.root.after(0, lambda: [self._unlock_trophy(f"mc_{k}") for k in matched])
+            matched_mc  = [k for k in MC_ADVANCEMENTS  if k in found_mc]
+            matched_mod = [k for k in MOD_ADVANCEMENTS if k in found_mod]
+            total = len(matched_mc) + len(matched_mod)
+            if total:
+                def unlock_all():
+                    for k in matched_mc:  self._unlock_trophy(f"mc_{k}")
+                    for k in matched_mod: self._unlock_trophy(f"mod_{k}")
+                self.root.after(0, unlock_all)
             else:
                 self.root.after(0, lambda: self._add_log(
-                    "Aucun nouveau succès Minecraft détecté dans les sauvegardes locales"))
+                    "Aucun nouveau succès détecté dans les sauvegardes locales"))
         threading.Thread(target=run, daemon=True).start()
 
     def _sync_trophies_from_server(self):

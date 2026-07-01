@@ -1,9 +1,5 @@
 name: Build Sakura Launcher (Windows / macOS / Linux)
 
-# Se déclenche sur chaque push de tag de version (ex: v2.1.0) ou manuellement
-# depuis l'onglet Actions de GitHub. Compile sur les 3 OS en parallèle via
-# des vraies machines Windows/macOS/Linux fournies par GitHub — pas besoin
-# de posséder un Mac pour obtenir un .app/.dmg.
 on:
   push:
     tags: ["v*"]
@@ -29,46 +25,62 @@ jobs:
           python-version: "3.11"
 
       - name: Installer les dépendances
-        run: |
-          pip install -r requirements.txt
+        run: pip install -r requirements.txt
 
-      - name: Build Windows
+      # ── Build launcher principal ──────────────────────────────────────────
+      - name: Build Windows (normal)
         if: matrix.name == 'windows'
-        # --onefile : un seul .exe autonome (plus simple à distribuer, mais
-        # plus susceptible d'être flaggé par Windows Defender que --onedir)
-        run: |
-          pyinstaller --noconfirm --onefile --windowed --noupx --name SakuraLauncher --icon icon.ico --add-data "icon.png;." --distpath dist sakura.py
+        run: pyinstaller --noconfirm --onefile --windowed --noupx --name SakuraLauncher --icon icon.ico --add-data "icon.png;." --distpath dist sakura.py
 
-      - name: Build macOS
+      - name: Build macOS (normal)
         if: matrix.name == 'macos'
-        run: |
-          pyinstaller --noconfirm --windowed --name SakuraLauncher --icon icon.icns --add-data "icon.png:." --distpath dist sakura.py
+        run: pyinstaller --noconfirm --windowed --name SakuraLauncher --icon icon.icns --add-data "icon.png:." --distpath dist sakura.py
 
-      - name: Build Linux
+      - name: Build Linux (normal)
         if: matrix.name == 'linux'
-        run: |
-          pyinstaller --noconfirm --onedir --name SakuraLauncher --icon icon.png --add-data "icon.png:." --distpath dist sakura.py
+        run: pyinstaller --noconfirm --onedir --name SakuraLauncher --icon icon.png --add-data "icon.png:." --distpath dist sakura.py
 
-      # Zippe le build en un seul fichier par OS, pour un lien de
-      # téléchargement direct simple dans la Release GitHub (pas un dossier
-      # à explorer comme avec les artifacts).
+      # ── Build version Low PC ──────────────────────────────────────────────
+      - name: Build Windows (LowPC)
+        if: matrix.name == 'windows'
+        run: pyinstaller --noconfirm --onefile --windowed --noupx --name SakuraLauncher-LowPC --icon icon.ico --add-data "icon.png;." --distpath dist "sakura_low pc.py"
+
+      - name: Build macOS (LowPC)
+        if: matrix.name == 'macos'
+        run: pyinstaller --noconfirm --windowed --name SakuraLauncher-LowPC --icon icon.icns --add-data "icon.png:." --distpath dist "sakura_low pc.py"
+
+      - name: Build Linux (LowPC)
+        if: matrix.name == 'linux'
+        run: pyinstaller --noconfirm --onedir --name SakuraLauncher-LowPC --icon icon.png --add-data "icon.png:." --distpath dist "sakura_low pc.py"
+
+      # ── Zip Windows ───────────────────────────────────────────────────────
       - name: Zip (Windows)
         if: matrix.name == 'windows'
-        run: Compress-Archive -Path dist\SakuraLauncher.exe -DestinationPath SakuraLauncher-windows.zip
+        run: |
+          Compress-Archive -Path dist\SakuraLauncher.exe -DestinationPath SakuraLauncher-windows.zip
+          Compress-Archive -Path dist\SakuraLauncher-LowPC.exe -DestinationPath SakuraLauncher-LowPC-windows.zip
 
+      # ── Zip macOS ─────────────────────────────────────────────────────────
       - name: Zip (macOS)
         if: matrix.name == 'macos'
-        run: cd dist && zip -r ../SakuraLauncher-macos.zip SakuraLauncher.app
+        run: |
+          cd dist && zip -r ../SakuraLauncher-macos.zip SakuraLauncher.app
+          cd dist && zip -r ../SakuraLauncher-LowPC-macos.zip SakuraLauncher-LowPC.app
 
+      # ── Zip Linux ─────────────────────────────────────────────────────────
       - name: Zip (Linux)
         if: matrix.name == 'linux'
-        run: cd dist && zip -r ../SakuraLauncher-linux.zip SakuraLauncher
+        run: |
+          cd dist && zip -r ../SakuraLauncher-linux.zip SakuraLauncher
+          cd dist && zip -r ../SakuraLauncher-LowPC-linux.zip SakuraLauncher-LowPC
 
-      - name: Upload artefact
+      - name: Upload artefacts
         uses: actions/upload-artifact@v4
         with:
           name: SakuraLauncher-${{ matrix.name }}
-          path: SakuraLauncher-${{ matrix.name }}.zip
+          path: |
+            SakuraLauncher-${{ matrix.name }}.zip
+            SakuraLauncher-LowPC-${{ matrix.name }}.zip
 
   release:
     needs: build

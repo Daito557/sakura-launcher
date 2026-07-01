@@ -475,7 +475,7 @@ def find_java21() -> str | None:
 def aikar_jvm_flags(ram_mb):
     region   = "4M" if ram_mb < 12288 else "8M"
     xms_mb   = min(2048, max(1024, ram_mb // 4))
-    flags = [
+    return [
         f"-Xms{xms_mb}m", f"-Xmx{ram_mb}m",
         "-XX:+UseG1GC", "-XX:+ParallelRefProcEnabled",
         "-XX:MaxGCPauseMillis=200", "-XX:+UnlockExperimentalVMOptions",
@@ -490,30 +490,8 @@ def aikar_jvm_flags(ram_mb):
         "-XX:CICompilerCount=2",
         "-Dusing.aikars.flags=https://mcflags.emc.gs",
         "-Dfile.encoding=UTF-8",
-        # Accélère le chargement des classes (tiered compilation rapide)
-        "-XX:+TieredCompilation", "-XX:TieredStopAtLevel=1",
-        # Réduit la latence réseau Netty (utilisé par Minecraft)
         "-Djava.net.preferIPv4Stack=true",
-        # Désactive les vérifications de bytecode inutiles en prod
-        "-XX:-OmitStackTraceInFastThrow",
     ]
-    # Flags supplémentaires Java 21+ (NeoForge 1.21 tourne sur Java 21)
-    try:
-        import re
-        out = subprocess.check_output(["java", "-version"],
-                                      stderr=subprocess.STDOUT, timeout=3).decode(errors="replace")
-        m = re.search(r'version "(\d+)', out)
-        if m and int(m.group(1)) >= 21:
-            flags += [
-                # Compact object headers (Project Lilliput, réduit la RAM objet ~10 %)
-                "-XX:+UnlockExperimentalVMOptions", "-XX:+UseCompactObjectHeaders",
-                # Meilleure réponse GC sur Java 21
-                "-XX:+UseTransparentHugePages" if sys.platform == "linux" else "",
-            ]
-            flags = [f for f in flags if f]
-    except Exception:
-        pass
-    return flags
 
 def boost_process_priority(pid, level="high"):
     """Donne au process Minecraft une priorité CPU plus élevée que les

@@ -935,11 +935,11 @@ class SakuraLauncher:
                 if img.height > h:
                     top = (img.height - h) // 2
                     img = img.crop((0, top, w, top + h))
-                img = ImageEnhance.Brightness(img).enhance(0.6)
+                img = ImageEnhance.Brightness(img).enhance(0.75)
                 overlay = Image.new("RGBA", img.size, (0, 0, 0, 0))
                 draw = ImageDraw.Draw(overlay)
-                for i in range(min(500, w)):
-                    alpha = int(200 * (1 - i / 500))
+                for i in range(min(320, w)):
+                    alpha = int(120 * (1 - i / 320))
                     draw.line([(i, 0), (i, h)], fill=(10, 8, 20, alpha))
                 img = Image.alpha_composite(img.convert("RGBA"), overlay).convert("RGB")
                 photo = ImageTk.PhotoImage(img)

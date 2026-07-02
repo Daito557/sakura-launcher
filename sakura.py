@@ -941,6 +941,10 @@ class SakuraLauncher:
                 if not bg_path.exists():
                     bg_path = BASE_DIR / "background.jpg"
                 if not bg_path.exists():
+                    bg_path = BASE_DIR / "_internal" / "background.jpg"
+                if not bg_path.exists():
+                    bg_path = Path("/usr/lib/sakura-launcher/_internal/background.jpg")
+                if not bg_path.exists():
                     return
                 canvas.update_idletasks()
                 w = canvas.winfo_width()

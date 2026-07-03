@@ -950,7 +950,9 @@ class SakuraLauncher:
                 w = canvas.winfo_width()
                 h = canvas.winfo_height() or h
                 if w < 10:
-                    return
+                    w = canvas.winfo_reqwidth() or 800
+                if w < 10:
+                    w = 800
                 img = Image.open(bg_path)
                 ratio = w / img.width
                 img = img.resize((w, max(h, int(img.height * ratio))), Image.LANCZOS)

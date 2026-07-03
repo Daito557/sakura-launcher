@@ -111,9 +111,10 @@ jobs:
           DESKTOP
 
           # Fichier de contrôle deb
-          cat > $PKG/DEBIAN/control << 'CONTROL'
+          VERSION=${GITHUB_REF_NAME#v}
+          cat > $PKG/DEBIAN/control << CONTROL
           Package: sakura-launcher
-          Version: 2.1.5
+          Version: $VERSION
           Architecture: amd64
           Maintainer: Sakura <boisniert455@gmail.com>
           Description: Sakura Minecraft Launcher

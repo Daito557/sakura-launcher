@@ -83,6 +83,10 @@ def cmd_install_game(args) -> None:
 
 
 def cmd_run(args) -> None:
+    if args.store == "steam":
+        stores = make_all_stores()
+        stores["steam"].launch_game(args.game_id)
+        return
     install_manager.launch_game(args.store, args.game_id)
 
 

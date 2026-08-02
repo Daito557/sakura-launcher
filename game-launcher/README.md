@@ -10,6 +10,7 @@ une installation simple.
 | Store            | Statut                                                        |
 |------------------|----------------------------------------------------------------|
 | GOG              | ✅ Fonctionnel : login, bibliothèque, téléchargement, install, run |
+| Steam            | ✅ Fonctionnel : login (clé API), bibliothèque, lancement (Steam gère le téléchargement/Proton lui-même) |
 | Epic Games Store | 🚧 Stub — pas d'API publique, à reverse-ingénier                |
 | EA App           | 🚧 Stub                                                         |
 | Ubisoft Connect  | 🚧 Stub                                                         |
@@ -32,6 +33,9 @@ pip install -r requirements.txt
 ```bash
 python3 cli.py stores                    # état de connexion par store
 python3 cli.py login gog                 # se connecter à GOG
+python3 cli.py login steam               # se connecter à Steam (clé API + SteamID64)
+python3 cli.py library steam             # lister les jeux possédés sur Steam
+python3 cli.py run steam <appid>         # lancer un jeu Steam déjà installé
 python3 cli.py library gog               # lister les jeux possédés sur GOG
 python3 cli.py install-ge                # télécharger la dernière GE-Proton
 python3 cli.py proton-versions           # versions Proton détectées
@@ -63,6 +67,7 @@ install_manager.py   orchestration : téléchargement -> préfixe -> install -> 
 stores/
   base.py             interface StoreClient (à implémenter par store)
   gog.py              implémentation GOG (fonctionnelle)
+  steam.py            implémentation Steam (fonctionnelle, lecture seule + lancement)
   epic.py, ea.py, ubisoft.py, battlenet.py   stubs
 cli.py                interface en ligne de commande
 ui/app.py             interface graphique customtkinter
@@ -77,3 +82,6 @@ ui/app.py             interface graphique customtkinter
   (`--exe`), le launcher ne le détecte pas automatiquement.
 - Epic/EA/Ubisoft/Battle.net ne sont pas encore implémentés : pas d'API
   publique documentée, contrairement à GOG.
+- Steam est en lecture seule côté launcher (bibliothèque + lancement) : les
+  installations/mises à jour de jeux passent toujours par le client Steam,
+  qui gère déjà très bien Proton nativement.

@@ -127,6 +127,10 @@ class GameLauncherApp(ctk.CTk):
         self._games_frame.pack(fill="both", expand=True)
 
     def _login(self, store) -> None:
+        if store.store_id == "steam":
+            self._login_steam(store)
+            return
+
         try:
             import webbrowser
             webbrowser.open(store.login_url())
@@ -142,6 +146,26 @@ class GameLauncherApp(ctk.CTk):
         try:
             store.login_with_code(pasted)
             messagebox.showinfo("Connexion", f"Connecté à {store.display_name}.")
+            self.show_store(store)
+        except Exception as e:
+            messagebox.showerror("Erreur de connexion", str(e))
+
+    def _login_steam(self, store) -> None:
+        api_key = simpledialog.askstring(
+            "Connexion Steam",
+            "Clé API Steam (https://steamcommunity.com/dev/apikey) :",
+        )
+        if not api_key:
+            return
+        steam_id = simpledialog.askstring(
+            "Connexion Steam",
+            "SteamID64 (steamcommunity.com/my -> Modifier le profil) :",
+        )
+        if not steam_id:
+            return
+        try:
+            store.login_with_credentials(api_key, steam_id)
+            messagebox.showinfo("Connexion", "Connecté à Steam.")
             self.show_store(store)
         except Exception as e:
             messagebox.showerror("Erreur de connexion", str(e))
@@ -168,7 +192,18 @@ class GameLauncherApp(ctk.CTk):
             row = ctk.CTkFrame(self._games_frame)
             row.pack(fill="x", pady=4)
             ctk.CTkLabel(row, text=g.title).pack(side="left", padx=10, pady=8)
-            ctk.CTkButton(row, text="Installer…", width=100, command=lambda gg=g: self._open_install_dialog(store, gg)).pack(side="right", padx=10)
+            if store.store_id == "steam":
+                # Steam gère lui-même l'installation et Proton : on ne fait
+                # que déclencher le lancement via le client Steam.
+                ctk.CTkButton(row, text="Lancer", width=100, command=lambda gg=g: self._launch_steam(store, gg)).pack(side="right", padx=10)
+            else:
+                ctk.CTkButton(row, text="Installer…", width=100, command=lambda gg=g: self._open_install_dialog(store, gg)).pack(side="right", padx=10)
+
+    def _launch_steam(self, store, game) -> None:
+        try:
+            store.launch_game(game.id)
+        except Exception as e:
+            messagebox.showerror("Erreur", str(e))
 
     def _open_install_dialog(self, store, game) -> None:
         versions = proton.find_proton_versions()

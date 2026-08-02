@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 
 from config import LIBRARY_FILE
 
@@ -15,6 +15,8 @@ class InstalledGame:
     proton_version: str
     prefix: str
     exe_path: str
+    launch_args: list[str] = field(default_factory=list)
+    env_vars: dict[str, str] = field(default_factory=dict)
 
 
 def _load() -> dict:

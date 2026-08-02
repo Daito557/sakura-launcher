@@ -103,8 +103,15 @@ def run_installer(proton_bin: Path, prefix: Path, installer_path: Path, silent_a
     )
 
 
-def run_game(proton_bin: Path, prefix: Path, exe_path: Path, extra_args: list[str] | None = None) -> None:
+def run_game(
+    proton_bin: Path,
+    prefix: Path,
+    exe_path: Path,
+    extra_args: list[str] | None = None,
+    extra_env: dict[str, str] | None = None,
+) -> None:
     env = _env_for_prefix(prefix)
+    env.update(extra_env or {})
     subprocess.run(
         [str(proton_bin), "waitforexitandrun", str(exe_path), *(extra_args or [])],
         env=env,

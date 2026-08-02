@@ -45,6 +45,17 @@ python3 cli.py install-game gog 1234567890 \
 
 python3 cli.py run gog 1234567890        # lancer le jeu installé
 python3 cli.py installed                 # lister les jeux installés localement
+
+# Ajouter un jeu déjà installé (hors store), avec sa propre config Proton/Wine
+python3 cli.py add-custom-game \
+    --title "Mon Jeu Itch.io" \
+    --exe "/home/user/Jeux/MonJeu/game.exe" \
+    --proton GE-Proton9-20 \
+    --arg "-windowed" \
+    --env "DXVK_HUD=fps" --env "PROTON_LOG=1"
+    # --prefix /chemin/vers/prefixe-existant   (optionnel, sinon un nouveau préfixe est créé)
+
+python3 cli.py run custom mon-jeu-itchio  # id auto-généré depuis le titre (slug)
 ```
 
 ## Interface graphique
@@ -55,7 +66,9 @@ python3 ui/app.py
 
 Mêmes fonctionnalités que le CLI (connexion par store, bibliothèque en
 ligne, installation guidée, versions Proton, lancement) dans une interface
-customtkinter.
+customtkinter, plus un bouton "+ Ajouter un jeu manuellement" pour un jeu
+hors store avec sa propre config Proton/Wine (exe, version, préfixe,
+arguments de lancement, variables d'environnement).
 
 ## Architecture
 

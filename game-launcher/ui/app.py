@@ -9,7 +9,7 @@ from __future__ import annotations
 import sys
 import threading
 from pathlib import Path
-from tkinter import messagebox, simpledialog
+from tkinter import filedialog, messagebox, simpledialog
 
 import customtkinter as ctk
 
@@ -55,6 +55,11 @@ class GameLauncherApp(ctk.CTk):
             command=self.show_proton,
         ).pack(fill="x", padx=10, pady=4)
 
+        ctk.CTkButton(
+            self.sidebar, text="+ Ajouter un jeu manuellement", fg_color="gray30",
+            command=self._add_custom_game_dialog,
+        ).pack(fill="x", padx=10, pady=4)
+
         self.show_installed()
 
     def _clear_content(self) -> None:
@@ -84,6 +89,61 @@ class GameLauncherApp(ctk.CTk):
                 install_manager.launch_game(game.store, game.id)
             except Exception as e:
                 messagebox.showerror("Erreur", str(e))
+        threading.Thread(target=worker, daemon=True).start()
+
+    # ── Ajout manuel d'un jeu ────────────────────────────────────────────
+
+    def _add_custom_game_dialog(self) -> None:
+        versions = proton.find_proton_versions()
+        if not versions:
+            messagebox.showwarning("Proton requis", "Installez d'abord une version de Proton (menu Versions Proton).")
+            return
+
+        title = simpledialog.askstring("Ajouter un jeu", "Nom du jeu :")
+        if not title:
+            return
+
+        exe = filedialog.askopenfilename(title="Sélectionnez l'exécutable (.exe)", filetypes=[("Exécutable Windows", "*.exe"), ("Tous les fichiers", "*.*")])
+        if not exe:
+            return
+
+        proton_version = simpledialog.askstring(
+            "Version Proton/Wine",
+            f"Versions disponibles : {', '.join(sorted(versions))}\n\nQuelle version utiliser ?",
+        )
+        if not proton_version or proton_version not in versions:
+            messagebox.showerror("Erreur", "Version Proton invalide.")
+            return
+
+        prefix = simpledialog.askstring(
+            "Préfixe Wine",
+            "Chemin d'un préfixe Wine existant à réutiliser (laisser vide pour en créer un nouveau) :",
+        )
+
+        args_raw = simpledialog.askstring("Arguments de lancement", "Arguments séparés par des espaces (laisser vide si aucun) :") or ""
+        launch_args = args_raw.split() if args_raw else []
+
+        env_raw = simpledialog.askstring(
+            "Variables d'environnement",
+            "Séparées par des virgules, ex: DXVK_HUD=1,PROTON_LOG=1 (laisser vide si aucune) :",
+        ) or ""
+        env_vars = {}
+        for item in [e.strip() for e in env_raw.split(",") if e.strip()]:
+            if "=" in item:
+                k, v = item.split("=", 1)
+                env_vars[k] = v
+
+        def worker():
+            try:
+                install_manager.add_custom_game(
+                    title=title, exe_path=exe, proton_version=proton_version,
+                    prefix_path=prefix or None, launch_args=launch_args, env_vars=env_vars,
+                )
+                self.after(0, lambda: messagebox.showinfo("Ajout", f"'{title}' ajouté à la bibliothèque."))
+                self.after(0, self.show_installed)
+            except Exception as e:
+                self.after(0, lambda: messagebox.showerror("Erreur", str(e)))
+
         threading.Thread(target=worker, daemon=True).start()
 
     # ── Vue : versions Proton ───────────────────────────────────────────

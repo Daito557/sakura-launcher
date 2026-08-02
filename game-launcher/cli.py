@@ -82,6 +82,27 @@ def cmd_install_game(args) -> None:
     print(f"'{game.title}' installé. Lancez-le avec : run {args.store} {args.game_id}")
 
 
+def cmd_add_custom_game(args) -> None:
+    env_vars = {}
+    for item in args.env or []:
+        if "=" not in item:
+            print(f"Variable d'environnement invalide (attendu KEY=VALEUR) : {item}", file=sys.stderr)
+            sys.exit(1)
+        key, value = item.split("=", 1)
+        env_vars[key] = value
+
+    game = install_manager.add_custom_game(
+        title=args.title,
+        exe_path=args.exe,
+        proton_version=args.proton,
+        prefix_path=args.prefix,
+        launch_args=args.arg or [],
+        env_vars=env_vars,
+    )
+    print(f"'{game.title}' ajouté. Lancez-le avec : run custom {game.id}")
+    print(f"  préfixe : {game.prefix}")
+
+
 def cmd_run(args) -> None:
     if args.store == "steam":
         stores = make_all_stores()
@@ -120,6 +141,18 @@ def build_parser() -> argparse.ArgumentParser:
     p_install.add_argument("--exe", required=True, help="Chemin relatif de l'exe une fois installé")
     p_install.add_argument("--no-silent", action="store_true", help="Ne pas passer /S à l'installateur")
     p_install.set_defaults(func=cmd_install_game)
+
+    p_custom = sub.add_parser(
+        "add-custom-game",
+        help="Ajouter un jeu déjà installé (hors store) avec sa propre config Proton/Wine",
+    )
+    p_custom.add_argument("--title", required=True)
+    p_custom.add_argument("--exe", required=True, help="Chemin complet vers l'exécutable")
+    p_custom.add_argument("--proton", required=True, help="Version Proton/Wine à utiliser")
+    p_custom.add_argument("--prefix", help="Préfixe Wine existant à réutiliser (sinon un nouveau est créé)")
+    p_custom.add_argument("--arg", action="append", help="Argument de lancement (répétable)")
+    p_custom.add_argument("--env", action="append", help="Variable d'environnement KEY=VALEUR (répétable, ex: DXVK_HUD=1)")
+    p_custom.set_defaults(func=cmd_add_custom_game)
 
     p_run = sub.add_parser("run", help="Lancer un jeu installé")
     p_run.add_argument("store")

@@ -8,6 +8,7 @@ l'installation terminée (cf. --exe dans le CLI).
 """
 from __future__ import annotations
 
+import re
 import urllib.request
 from pathlib import Path
 
@@ -79,4 +80,52 @@ def launch_game(store_id: str, game_id: str) -> None:
     if not proton_bin:
         raise RuntimeError(f"Version Proton introuvable : {game.proton_version}")
 
-    proton.run_game(proton_bin, Path(game.prefix), Path(game.exe_path))
+    proton.run_game(proton_bin, Path(game.prefix), Path(game.exe_path), game.launch_args, game.env_vars)
+
+
+def _slugify(title: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
+    return slug or "jeu"
+
+
+def add_custom_game(
+    title: str,
+    exe_path: str,
+    proton_version: str,
+    prefix_path: str | None = None,
+    launch_args: list[str] | None = None,
+    env_vars: dict[str, str] | None = None,
+    game_id: str | None = None,
+) -> library.InstalledGame:
+    """Enregistre un jeu déjà installé (hors store, ou déjà téléchargé
+    manuellement) avec sa propre configuration Proton/Wine complète :
+    version Proton, préfixe (nouveau ou existant), arguments de lancement,
+    variables d'environnement (ex: DXVK_HUD=1, PROTON_LOG=1)."""
+    versions = proton.find_proton_versions()
+    proton_bin = versions.get(proton_version)
+    if not proton_bin:
+        raise RuntimeError(f"Version Proton introuvable : {proton_version}")
+
+    exe = Path(exe_path).expanduser().resolve()
+    if not exe.is_file():
+        raise RuntimeError(f"Fichier introuvable : {exe}")
+
+    game_id = game_id or _slugify(title)
+    game_key = library.key_for("custom", game_id)
+    prefix = Path(prefix_path).expanduser().resolve() if prefix_path else proton.prefix_path_for(game_key)
+
+    if not prefix.exists():
+        proton.init_prefix(proton_bin, prefix)
+
+    game = library.InstalledGame(
+        store="custom",
+        id=game_id,
+        title=title,
+        proton_version=proton_version,
+        prefix=str(prefix),
+        exe_path=str(exe),
+        launch_args=launch_args or [],
+        env_vars=env_vars or {},
+    )
+    library.add_game(game)
+    return game

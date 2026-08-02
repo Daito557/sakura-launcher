@@ -152,6 +152,18 @@ class GogClient(StoreClient):
         filename = urllib.parse.unquote(_filename_from_url(download_url))
         return DownloadInfo(url=download_url, filename=filename)
 
+    # ── Mises à jour ─────────────────────────────────────────────────────
+
+    def get_latest_version(self, game_id: str) -> str:
+        """Version de l'installateur Windows actuellement publiée par GOG,
+        utilisée pour détecter si une mise à jour est disponible."""
+        info = _http_json(f"https://api.gog.com/products/{game_id}?expand=downloads")
+        installers = info.get("downloads", {}).get("installers", [])
+        windows_installer = next((i for i in installers if i.get("os") == "windows"), None)
+        if not windows_installer:
+            return ""
+        return str(windows_installer.get("version", ""))
+
 
 def _filename_from_url(url: str) -> str:
     path = urllib.parse.urlparse(url).path

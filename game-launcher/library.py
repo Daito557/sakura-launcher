@@ -17,6 +17,8 @@ class InstalledGame:
     exe_path: str
     launch_args: list[str] = field(default_factory=list)
     env_vars: dict[str, str] = field(default_factory=dict)
+    fullscreen: bool = True
+    version: str = ""
 
 
 def _load() -> dict:

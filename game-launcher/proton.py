@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tarfile
@@ -73,6 +74,16 @@ def install_latest_ge(force: bool = False) -> str:
     return tag
 
 
+def ensure_proton_available() -> str:
+    """Garantit qu'au moins une version de Proton/Wine est utilisable, en
+    téléchargeant automatiquement la dernière GE-Proton si aucune n'est
+    détectée (ni Steam, ni une précédente installation de ce launcher)."""
+    versions = find_proton_versions()
+    if versions:
+        return sorted(versions)[-1]
+    return install_latest_ge()
+
+
 def prefix_path_for(game_key: str) -> Path:
     safe = "".join(c if c.isalnum() or c in "-_." else "_" for c in game_key)
     return PREFIXES_DIR / safe
@@ -109,10 +120,20 @@ def run_game(
     exe_path: Path,
     extra_args: list[str] | None = None,
     extra_env: dict[str, str] | None = None,
+    fullscreen: bool = False,
 ) -> None:
     env = _env_for_prefix(prefix)
     env.update(extra_env or {})
-    subprocess.run(
-        [str(proton_bin), "waitforexitandrun", str(exe_path), *(extra_args or [])],
-        env=env,
-    )
+
+    command = [str(proton_bin), "waitforexitandrun", str(exe_path), *(extra_args or [])]
+    if fullscreen:
+        gamescope = shutil.which("gamescope")
+        if gamescope:
+            # gamescope force une vraie sortie plein écran, quel que soit
+            # le paramètre interne du jeu (approche utilisée par Heroic/Lutris).
+            command = [gamescope, "-f", "--"] + command
+        else:
+            # Best-effort : la plupart des moteurs Windows respectent -fullscreen.
+            command.append("-fullscreen")
+
+    subprocess.run(command, env=env)

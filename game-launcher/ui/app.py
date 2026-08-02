@@ -3,6 +3,11 @@
 Reste une couche fine au-dessus de cli.py / install_manager.py / stores/* :
 aucune logique métier ici, uniquement de l'affichage et des appels aux
 fonctions déjà testées en CLI.
+
+Structure : barre latérale à gauche (Bibliothèque, un bouton par store,
+Paramètres), panneau de contenu à droite qui change selon la sélection —
+y compris un panneau de réglages par jeu (Proton, arguments, variables
+d'environnement, plein écran).
 """
 from __future__ import annotations
 
@@ -28,75 +33,191 @@ class GameLauncherApp(ctk.CTk):
     def __init__(self) -> None:
         super().__init__()
         self.title("Sakura Game Launcher")
-        self.geometry("1000x650")
+        self.geometry("1100x700")
 
         self.stores = make_all_stores()
+        self._updates_cache: list[tuple[library.InstalledGame, str]] = []
 
-        self.sidebar = ctk.CTkFrame(self, width=200)
+        self.sidebar = ctk.CTkFrame(self, width=220)
         self.sidebar.pack(side="left", fill="y")
 
         self.content = ctk.CTkScrollableFrame(self)
         self.content.pack(side="right", fill="both", expand=True, padx=10, pady=10)
 
-        ctk.CTkLabel(self.sidebar, text="Stores", font=ctk.CTkFont(size=16, weight="bold")).pack(pady=(20, 10))
-        for store in self.stores.values():
-            ctk.CTkButton(
-                self.sidebar, text=store.display_name,
-                command=lambda s=store: self.show_store(s),
-            ).pack(fill="x", padx=10, pady=4)
+        self.proton_status = ctk.CTkLabel(self.sidebar, text="Proton : vérification…", text_color="gray70", font=ctk.CTkFont(size=11))
+        self.proton_status.pack(pady=(10, 0), padx=10, anchor="w")
 
         ctk.CTkButton(
-            self.sidebar, text="Jeux installés", fg_color="gray30",
-            command=self.show_installed,
-        ).pack(fill="x", padx=10, pady=(20, 4))
+            self.sidebar, text="📚 Bibliothèque", anchor="w",
+            command=self.show_library,
+        ).pack(fill="x", padx=10, pady=(10, 4))
 
         ctk.CTkButton(
-            self.sidebar, text="Versions Proton", fg_color="gray30",
-            command=self.show_proton,
-        ).pack(fill="x", padx=10, pady=4)
-
-        ctk.CTkButton(
-            self.sidebar, text="+ Ajouter un jeu manuellement", fg_color="gray30",
+            self.sidebar, text="+ Ajouter un jeu manuellement", anchor="w", fg_color="gray30",
             command=self._add_custom_game_dialog,
         ).pack(fill="x", padx=10, pady=4)
 
-        self.show_installed()
+        ctk.CTkLabel(self.sidebar, text="Stores", font=ctk.CTkFont(size=13, weight="bold")).pack(pady=(20, 6), padx=10, anchor="w")
+        for store in self.stores.values():
+            ctk.CTkButton(
+                self.sidebar, text=store.display_name, anchor="w",
+                command=lambda s=store: self.show_store(s),
+            ).pack(fill="x", padx=10, pady=3)
+
+        ctk.CTkButton(
+            self.sidebar, text="⚙ Paramètres", anchor="w", fg_color="gray30",
+            command=self.show_settings,
+        ).pack(fill="x", padx=10, pady=(20, 4), side="bottom")
+
+        self.show_library()
+        threading.Thread(target=self._ensure_proton_at_startup, daemon=True).start()
 
     def _clear_content(self) -> None:
         for child in self.content.winfo_children():
             child.destroy()
 
-    # ── Vue : jeux installés ────────────────────────────────────────────
+    # ── Démarrage : Proton/Wine auto ─────────────────────────────────────
 
-    def show_installed(self) -> None:
+    def _ensure_proton_at_startup(self) -> None:
+        try:
+            version = proton.ensure_proton_available()
+            self.after(0, lambda: self.proton_status.configure(text=f"Proton : {version} ✓", text_color="lightgreen"))
+        except Exception as e:
+            self.after(0, lambda: self.proton_status.configure(text="Proton : échec du téléchargement auto", text_color="orange"))
+
+    # ── Vue : bibliothèque (jeux installés) ──────────────────────────────
+
+    def show_library(self) -> None:
         self._clear_content()
-        ctk.CTkLabel(self.content, text="Jeux installés", font=ctk.CTkFont(size=20, weight="bold")).pack(anchor="w", pady=(0, 10))
+        header = ctk.CTkFrame(self.content, fg_color="transparent")
+        header.pack(fill="x", pady=(0, 10))
+        ctk.CTkLabel(header, text="Bibliothèque", font=ctk.CTkFont(size=20, weight="bold")).pack(side="left")
+        ctk.CTkButton(header, text="Vérifier les mises à jour", width=180, command=self._check_updates).pack(side="right")
 
         games = library.list_games()
         if not games:
             ctk.CTkLabel(self.content, text="Aucun jeu installé pour le moment.").pack(anchor="w")
             return
 
+        updates_by_key = {library.key_for(g.store, g.id): v for g, v in self._updates_cache}
+
         for g in games:
             row = ctk.CTkFrame(self.content)
             row.pack(fill="x", pady=4)
-            ctk.CTkLabel(row, text=f"{g.title}  ({g.store}, {g.proton_version})").pack(side="left", padx=10, pady=8)
-            ctk.CTkButton(row, text="Lancer", width=100, command=lambda gg=g: self._launch(gg)).pack(side="right", padx=10)
+
+            info = ctk.CTkFrame(row, fg_color="transparent")
+            info.pack(side="left", fill="x", expand=True, padx=10, pady=8)
+            fs = "plein écran" if g.fullscreen else "fenêtré"
+            ctk.CTkLabel(info, text=g.title, font=ctk.CTkFont(weight="bold")).pack(anchor="w")
+            ctk.CTkLabel(info, text=f"{g.store} · {g.proton_version} · {fs}", text_color="gray70", font=ctk.CTkFont(size=11)).pack(anchor="w")
+
+            key = library.key_for(g.store, g.id)
+            if key in updates_by_key:
+                ctk.CTkButton(row, text=f"Mettre à jour → {updates_by_key[key]}", width=160, fg_color="darkorange", command=lambda gg=g: self._update_game(gg)).pack(side="right", padx=6)
+
+            ctk.CTkButton(row, text="Désinstaller", width=100, fg_color="darkred", command=lambda gg=g: self._uninstall(gg)).pack(side="right", padx=6)
+            ctk.CTkButton(row, text="⚙", width=40, command=lambda gg=g: self.show_game_settings(gg)).pack(side="right", padx=6)
+            ctk.CTkButton(row, text="Lancer", width=90, command=lambda gg=g: self._launch(gg)).pack(side="right", padx=6)
 
     def _launch(self, game: library.InstalledGame) -> None:
         def worker():
             try:
                 install_manager.launch_game(game.store, game.id)
             except Exception as e:
-                messagebox.showerror("Erreur", str(e))
+                self.after(0, lambda: messagebox.showerror("Erreur", str(e)))
         threading.Thread(target=worker, daemon=True).start()
+
+    def _uninstall(self, game: library.InstalledGame) -> None:
+        if not messagebox.askyesno("Désinstaller", f"Désinstaller '{game.title}' ? Le préfixe et les fichiers installés seront supprimés."):
+            return
+
+        def worker():
+            try:
+                install_manager.uninstall_game(game.store, game.id)
+                self.after(0, self.show_library)
+            except Exception as e:
+                self.after(0, lambda: messagebox.showerror("Erreur", str(e)))
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _check_updates(self) -> None:
+        def worker():
+            updates = install_manager.check_all_updates(self.stores)
+            self._updates_cache = updates
+            if not updates:
+                self.after(0, lambda: messagebox.showinfo("Mises à jour", "Tous les jeux sont à jour."))
+            self.after(0, self.show_library)
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _update_game(self, game: library.InstalledGame) -> None:
+        store = self.stores.get(game.store)
+        if not store:
+            return
+
+        def worker():
+            try:
+                install_manager.update_game(store, game)
+                self._updates_cache = [(g, v) for g, v in self._updates_cache if g.id != game.id or g.store != game.store]
+                self.after(0, lambda: messagebox.showinfo("Mise à jour", f"'{game.title}' mis à jour."))
+                self.after(0, self.show_library)
+            except Exception as e:
+                self.after(0, lambda: messagebox.showerror("Erreur", str(e)))
+        threading.Thread(target=worker, daemon=True).start()
+
+    # ── Vue : réglages d'un jeu ──────────────────────────────────────────
+
+    def show_game_settings(self, game: library.InstalledGame) -> None:
+        self._clear_content()
+        ctk.CTkLabel(self.content, text=f"Réglages — {game.title}", font=ctk.CTkFont(size=20, weight="bold")).pack(anchor="w", pady=(0, 20))
+
+        versions = sorted(proton.find_proton_versions())
+        ctk.CTkLabel(self.content, text="Version Proton/Wine").pack(anchor="w")
+        proton_var = ctk.StringVar(value=game.proton_version)
+        ctk.CTkOptionMenu(self.content, values=versions or [game.proton_version], variable=proton_var).pack(anchor="w", pady=(0, 15))
+
+        ctk.CTkLabel(self.content, text="Arguments de lancement (séparés par des espaces)").pack(anchor="w")
+        args_entry = ctk.CTkEntry(self.content, width=500)
+        args_entry.insert(0, " ".join(game.launch_args))
+        args_entry.pack(anchor="w", pady=(0, 15))
+
+        ctk.CTkLabel(self.content, text="Variables d'environnement (KEY=VALEUR, séparées par des virgules)").pack(anchor="w")
+        env_entry = ctk.CTkEntry(self.content, width=500)
+        env_entry.insert(0, ",".join(f"{k}={v}" for k, v in game.env_vars.items()))
+        env_entry.pack(anchor="w", pady=(0, 15))
+
+        fullscreen_var = ctk.BooleanVar(value=game.fullscreen)
+        ctk.CTkSwitch(self.content, text="Forcer le plein écran", variable=fullscreen_var).pack(anchor="w", pady=(0, 20))
+
+        def save():
+            args = args_entry.get().split()
+            env_vars = {}
+            for item in [e.strip() for e in env_entry.get().split(",") if e.strip()]:
+                if "=" in item:
+                    k, v = item.split("=", 1)
+                    env_vars[k] = v
+            try:
+                install_manager.update_game_settings(
+                    game.store, game.id,
+                    proton_version=proton_var.get(),
+                    launch_args=args,
+                    env_vars=env_vars,
+                    fullscreen=fullscreen_var.get(),
+                )
+                messagebox.showinfo("Réglages", "Enregistré.")
+                self.show_library()
+            except Exception as e:
+                messagebox.showerror("Erreur", str(e))
+
+        btns = ctk.CTkFrame(self.content, fg_color="transparent")
+        btns.pack(anchor="w")
+        ctk.CTkButton(btns, text="Enregistrer", command=save).pack(side="left", padx=(0, 10))
+        ctk.CTkButton(btns, text="Retour", fg_color="gray30", command=self.show_library).pack(side="left")
 
     # ── Ajout manuel d'un jeu ────────────────────────────────────────────
 
     def _add_custom_game_dialog(self) -> None:
         versions = proton.find_proton_versions()
         if not versions:
-            messagebox.showwarning("Proton requis", "Installez d'abord une version de Proton (menu Versions Proton).")
+            messagebox.showwarning("Proton requis", "Aucune version Proton détectée pour le moment (téléchargement automatique en cours au démarrage, réessayez dans un instant, ou passez par Paramètres).")
             return
 
         title = simpledialog.askstring("Ajouter un jeu", "Nom du jeu :")
@@ -133,43 +254,61 @@ class GameLauncherApp(ctk.CTk):
                 k, v = item.split("=", 1)
                 env_vars[k] = v
 
+        fullscreen = messagebox.askyesno("Plein écran", "Forcer le lancement en plein écran ?", default="yes")
+
         def worker():
             try:
                 install_manager.add_custom_game(
                     title=title, exe_path=exe, proton_version=proton_version,
                     prefix_path=prefix or None, launch_args=launch_args, env_vars=env_vars,
+                    fullscreen=fullscreen,
                 )
                 self.after(0, lambda: messagebox.showinfo("Ajout", f"'{title}' ajouté à la bibliothèque."))
-                self.after(0, self.show_installed)
+                self.after(0, self.show_library)
             except Exception as e:
                 self.after(0, lambda: messagebox.showerror("Erreur", str(e)))
 
         threading.Thread(target=worker, daemon=True).start()
 
-    # ── Vue : versions Proton ───────────────────────────────────────────
+    # ── Vue : Paramètres ─────────────────────────────────────────────────
 
-    def show_proton(self) -> None:
+    def show_settings(self) -> None:
         self._clear_content()
-        ctk.CTkLabel(self.content, text="Versions Proton", font=ctk.CTkFont(size=20, weight="bold")).pack(anchor="w", pady=(0, 10))
+        ctk.CTkLabel(self.content, text="Paramètres", font=ctk.CTkFont(size=20, weight="bold")).pack(anchor="w", pady=(0, 20))
 
+        ctk.CTkLabel(self.content, text="Versions Proton/Wine", font=ctk.CTkFont(size=15, weight="bold")).pack(anchor="w", pady=(0, 6))
         versions = proton.find_proton_versions()
         if not versions:
-            ctk.CTkLabel(self.content, text="Aucune version détectée.").pack(anchor="w", pady=(0, 10))
+            ctk.CTkLabel(self.content, text="Aucune version détectée.").pack(anchor="w", pady=(0, 6))
         else:
             for name in sorted(versions):
                 ctk.CTkLabel(self.content, text=f"- {name}").pack(anchor="w")
+        ctk.CTkButton(self.content, text="Télécharger la dernière GE-Proton", command=self._install_ge).pack(anchor="w", pady=(10, 25))
 
-        ctk.CTkButton(self.content, text="Télécharger la dernière GE-Proton", command=self._install_ge).pack(anchor="w", pady=20)
+        ctk.CTkLabel(self.content, text="Connexions aux stores", font=ctk.CTkFont(size=15, weight="bold")).pack(anchor="w", pady=(0, 6))
+        for store in self.stores.values():
+            row = ctk.CTkFrame(self.content, fg_color="transparent")
+            row.pack(fill="x", pady=2)
+            status = "connecté" if store.is_authenticated() else "non connecté"
+            ctk.CTkLabel(row, text=f"{store.display_name} — {status}").pack(side="left")
+            if store.is_authenticated():
+                ctk.CTkButton(row, text="Déconnecter", width=100, fg_color="gray30", command=lambda s=store: self._logout(s)).pack(side="right")
+            else:
+                ctk.CTkButton(row, text="Se connecter", width=100, command=lambda s=store: self._login(s)).pack(side="right")
+
+    def _logout(self, store) -> None:
+        store.logout()
+        self.show_settings()
 
     def _install_ge(self) -> None:
         def worker():
             try:
                 tag = proton.install_latest_ge()
-                messagebox.showinfo("Proton", f"GE-Proton {tag} installé.")
+                self.after(0, lambda: messagebox.showinfo("Proton", f"GE-Proton {tag} installé."))
             except Exception as e:
-                messagebox.showerror("Erreur", str(e))
+                self.after(0, lambda: messagebox.showerror("Erreur", str(e)))
             finally:
-                self.after(0, self.show_proton)
+                self.after(0, self.show_settings)
         threading.Thread(target=worker, daemon=True).start()
 
     # ── Vue : bibliothèque d'un store ───────────────────────────────────
@@ -266,22 +405,17 @@ class GameLauncherApp(ctk.CTk):
             messagebox.showerror("Erreur", str(e))
 
     def _open_install_dialog(self, store, game) -> None:
-        versions = proton.find_proton_versions()
-        if not versions:
-            messagebox.showwarning("Proton requis", "Installez d'abord une version de Proton (menu Versions Proton).")
-            return
-        proton_version = simpledialog.askstring("Version Proton", f"Versions disponibles : {', '.join(sorted(versions))}\n\nQuelle version utiliser ?")
-        if not proton_version or proton_version not in versions:
-            return
+        proton_version = "auto"
+        fullscreen = messagebox.askyesno("Plein écran", "Forcer le lancement en plein écran ?", default="yes")
         exe = simpledialog.askstring("Exécutable", "Chemin relatif de l'exécutable après installation (ex: Game.exe) :")
         if not exe:
             return
 
         def worker():
             try:
-                install_manager.install_game(store, game.id, game.title, proton_version, exe)
+                install_manager.install_game(store, game.id, game.title, proton_version, exe, fullscreen=fullscreen)
                 self.after(0, lambda: messagebox.showinfo("Installation", f"'{game.title}' installé."))
-                self.after(0, self.show_installed)
+                self.after(0, self.show_library)
             except Exception as e:
                 self.after(0, lambda: messagebox.showerror("Erreur d'installation", str(e)))
 

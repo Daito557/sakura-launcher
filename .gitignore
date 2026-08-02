@@ -18,3 +18,9 @@ output/
 # Données locales du serveur de présence (lancements/trophées, pas du code)
 server_data.json
 *.zip
+
+# Builds compilés (game-launcher, proton-manager)
+game-launcher/build/
+game-launcher/dist/
+proton-manager/build/
+proton-manager/dist/
